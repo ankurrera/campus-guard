@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Mail, Phone, GraduationCap, Lock, UserPlus } from 'lucide-react';
+import { User, Mail, Phone, Lock, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { buttonVariants } from '@/components/ui/button-variants';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,7 @@ export default function StudentSignup() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     rollNumber: '',
@@ -63,6 +64,7 @@ export default function StudentSignup() {
       }
 
       if (data.user) {
+        setUserId(data.user.id);
         toast.success('Successfully created an account! Now, please register your face.');
         setStep(3);
       }
@@ -71,19 +73,18 @@ export default function StudentSignup() {
 
   const handleFaceCapture = async (imageData: string) => {
     setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      toast.error('User not authenticated.');
+    
+    if (!userId) {
+      toast.error('User not authenticated. Please try again from the beginning.');
       setLoading(false);
       return;
     }
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('students')
       .insert([
         {
-          user_id: user.id,
+          user_id: userId,
           name: formData.name,
           roll_number: formData.rollNumber,
           email: formData.email,
