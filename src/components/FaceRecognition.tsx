@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Camera, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { Button } from './ui/button';
@@ -14,7 +15,6 @@ interface FaceRecognitionProps {
 
 // Correct type definition for the detection result to include landmarks and expressions
 type FaceDetectionResult = faceapi.WithFaceExpressions<
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   faceapi.WithFaceLandmarks<faceapi.WithFaceDetection<{}>>
 >;
 
@@ -128,19 +128,53 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
       ctx.globalAlpha = 0.3;
       ctx.lineWidth = 0.5;
   
-      drawMuscleConnection(ctx, positions[19], positions[37]);
-      drawMuscleConnection(ctx, positions[20], positions[38]);
-      drawMuscleConnection(ctx, positions[24], positions[43]);
-      drawMuscleConnection(ctx, positions[25], positions[44]);
-      drawMuscleConnection(ctx, positions[31], positions[48]);
-      drawMuscleConnection(ctx, positions[35], positions[54]);
-      drawMuscleConnection(ctx, positions[29], positions[51]);
-      drawMuscleConnection(ctx, positions[30], positions[33]);
-      drawMuscleConnection(ctx, positions[4], positions[48]);
-      drawMuscleConnection(ctx, positions[12], positions[54]);
-      drawMuscleConnection(ctx, positions[7], positions[57]);
-      drawMuscleConnection(ctx, positions[9], positions[57]);
+      // Connect eyebrows to the forehead
+      drawMuscleConnection(ctx, positions[17], positions[19]);
+      drawMuscleConnection(ctx, positions[18], positions[20]);
+      drawMuscleConnection(ctx, positions[25], positions[23]);
+      drawMuscleConnection(ctx, positions[26], positions[24]);
   
+      // Connect points around the eyes for a more detailed mesh
+      drawMuscleConnection(ctx, positions[36], positions[41]);
+      drawMuscleConnection(ctx, positions[37], positions[40]);
+      drawMuscleConnection(ctx, positions[38], positions[39]);
+      drawMuscleConnection(ctx, positions[42], positions[47]);
+      drawMuscleConnection(ctx, positions[43], positions[46]);
+      drawMuscleConnection(ctx, positions[44], positions[45]);
+  
+      // More connections around the mouth
+      drawMuscleConnection(ctx, positions[48], positions[60]);
+      drawMuscleConnection(ctx, positions[50], positions[61]);
+      drawMuscleConnection(ctx, positions[51], positions[62]);
+      drawMuscleConnection(ctx, positions[53], positions[64]);
+      drawMuscleConnection(ctx, positions[54], positions[65]);
+      drawMuscleConnection(ctx, positions[56], positions[66]);
+  
+      // Denser mesh for cheeks and nose
+      drawMuscleConnection(ctx, positions[3], positions[30]);
+      drawMuscleConnection(ctx, positions[13], positions[30]);
+      drawMuscleConnection(ctx, positions[48], positions[31]);
+      drawMuscleConnection(ctx, positions[54], positions[35]);
+      drawMuscleConnection(ctx, positions[30], positions[8]);
+      drawMuscleConnection(ctx, positions[48], positions[8]);
+      drawMuscleConnection(ctx, positions[54], positions[8]);
+  
+      // Cross-connections for the jawline
+      drawMuscleConnection(ctx, positions[1], positions[15]);
+      drawMuscleConnection(ctx, positions[2], positions[14]);
+      drawMuscleConnection(ctx, positions[3], positions[13]);
+      drawMuscleConnection(ctx, positions[4], positions[12]);
+      drawMuscleConnection(ctx, positions[5], positions[11]);
+      drawMuscleConnection(ctx, positions[6], positions[10]);
+      drawMuscleConnection(ctx, positions[7], positions[9]);
+
+      // Connect eyes to the corners of the mouth
+      drawMuscleConnection(ctx, positions[39], positions[48]);
+      drawMuscleConnection(ctx, positions[42], positions[54]);
+      drawMuscleConnection(ctx, positions[21], positions[33]);
+      drawMuscleConnection(ctx, positions[22], positions[33]);
+  
+      // Depth-based point highlighting
       ctx.globalAlpha = 0.8;
       const depthPoints = [
         positions[30],
@@ -180,7 +214,7 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
     const detections = await faceapi
       .detectAllFaces(videoRef.current, new faceapi.TinyFaceDetectorOptions())
       .withFaceLandmarks()
-      .withFaceExpressions();
+      .withFaceExpressions() as FaceDetectionResult[];
 
     detectionsRef.current = detections;
 
