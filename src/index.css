@@ -171,4 +171,13 @@
   .fade-in {
     animation: fade-in 0.5s ease-out;
   }
+
+  /* Added glowing effect to face mesh */
+  .face-mesh {
+    stroke: #ffffff;
+    stroke-width: 1.5;
+    fill: none;
+    opacity: 0.9;
+    filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.7));
+  }
 }
