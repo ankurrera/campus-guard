@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-empty-object-type */
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Camera, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { Button } from './ui/button';
@@ -15,6 +14,7 @@ interface FaceRecognitionProps {
 
 // Correct type definition for the detection result to include landmarks and expressions
 type FaceDetectionResult = faceapi.WithFaceExpressions<
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   faceapi.WithFaceLandmarks<faceapi.WithFaceDetection<{}>>
 >;
 
@@ -96,37 +96,39 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
       const landmarks = detection.landmarks;
       const positions = landmarks.positions;
   
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)'; // Increased opacity
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'; // Increased opacity
-      ctx.lineWidth = 0.8;
+      ctx.strokeStyle = '#ffffff';
+      ctx.fillStyle = '#ffffff';
+      ctx.lineWidth = 1.5; // Increased line width
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-  
-      ctx.globalAlpha = 0.6; // Increased opacity
-      drawMuscleGroup(ctx, positions.slice(17, 27), false);
+      ctx.shadowColor = 'rgba(139, 92, 246, 0.7)'; // Added glow effect
+      ctx.shadowBlur = 8; // Added glow effect
   
       ctx.globalAlpha = 0.9; // Increased opacity
+      drawMuscleGroup(ctx, positions.slice(17, 27), false);
+  
+      ctx.globalAlpha = 1.0; // Increased opacity
       drawMuscleGroup(ctx, positions.slice(36, 42), true);
       drawMuscleGroup(ctx, positions.slice(42, 48), true);
   
-      ctx.globalAlpha = 0.7; // Increased opacity
+      ctx.globalAlpha = 0.8; // Increased opacity
       const leftCheek = [positions[1], positions[2], positions[3], positions[31], positions[39]];
       const rightCheek = [positions[15], positions[14], positions[13], positions[35], positions[42]];
       drawMuscleGroup(ctx, leftCheek, false);
       drawMuscleGroup(ctx, rightCheek, false);
   
-      ctx.globalAlpha = 0.8; // Increased opacity
+      ctx.globalAlpha = 0.9; // Increased opacity
       drawMuscleGroup(ctx, positions.slice(27, 36), false);
   
-      ctx.globalAlpha = 0.9; // Increased opacity
+      ctx.globalAlpha = 1.0; // Increased opacity
       drawMuscleGroup(ctx, positions.slice(48, 60), true);
       drawMuscleGroup(ctx, positions.slice(60, 68), true);
   
-      ctx.globalAlpha = 0.7; // Increased opacity
+      ctx.globalAlpha = 0.8; // Increased opacity
       drawMuscleGroup(ctx, positions.slice(0, 17), false);
   
-      ctx.globalAlpha = 0.5; // Increased opacity
-      ctx.lineWidth = 0.5;
+      ctx.globalAlpha = 0.7; // Increased opacity
+      ctx.lineWidth = 1;
   
       // Connect eyebrows to the forehead
       drawMuscleConnection(ctx, positions[17], positions[19]);
@@ -174,7 +176,8 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
       drawMuscleConnection(ctx, positions[21], positions[33]);
       drawMuscleConnection(ctx, positions[22], positions[33]);
   
-      // Depth-based point highlighting
+      // Reset shadow for points to avoid blurring them too much
+      ctx.shadowBlur = 0;
       ctx.globalAlpha = 0.8;
       const depthPoints = [
         positions[30],
@@ -354,7 +357,7 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
             />
             <canvas
               ref={meshCanvasRef}
-              className={cn("face-mesh", isStreaming && "glow")}
+              className="absolute inset-0 w-full h-full"
               width={640}
               height={480}
             />
