@@ -96,36 +96,36 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
       const landmarks = detection.landmarks;
       const positions = landmarks.positions;
   
-      ctx.strokeStyle = '#ffffff';
-      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)'; // Increased opacity
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'; // Increased opacity
       ctx.lineWidth = 0.8;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
   
-      ctx.globalAlpha = 0.4;
+      ctx.globalAlpha = 0.6; // Increased opacity
       drawMuscleGroup(ctx, positions.slice(17, 27), false);
   
-      ctx.globalAlpha = 0.7;
+      ctx.globalAlpha = 0.9; // Increased opacity
       drawMuscleGroup(ctx, positions.slice(36, 42), true);
       drawMuscleGroup(ctx, positions.slice(42, 48), true);
   
-      ctx.globalAlpha = 0.5;
+      ctx.globalAlpha = 0.7; // Increased opacity
       const leftCheek = [positions[1], positions[2], positions[3], positions[31], positions[39]];
       const rightCheek = [positions[15], positions[14], positions[13], positions[35], positions[42]];
       drawMuscleGroup(ctx, leftCheek, false);
       drawMuscleGroup(ctx, rightCheek, false);
   
-      ctx.globalAlpha = 0.6;
+      ctx.globalAlpha = 0.8; // Increased opacity
       drawMuscleGroup(ctx, positions.slice(27, 36), false);
   
-      ctx.globalAlpha = 0.7;
+      ctx.globalAlpha = 0.9; // Increased opacity
       drawMuscleGroup(ctx, positions.slice(48, 60), true);
       drawMuscleGroup(ctx, positions.slice(60, 68), true);
   
-      ctx.globalAlpha = 0.5;
+      ctx.globalAlpha = 0.7; // Increased opacity
       drawMuscleGroup(ctx, positions.slice(0, 17), false);
   
-      ctx.globalAlpha = 0.3;
+      ctx.globalAlpha = 0.5; // Increased opacity
       ctx.lineWidth = 0.5;
   
       // Connect eyebrows to the forehead
@@ -354,7 +354,7 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
             />
             <canvas
               ref={meshCanvasRef}
-              className="absolute inset-0 w-full h-full pointer-events-none"
+              className={cn("face-mesh", isStreaming && "glow")}
               width={640}
               height={480}
             />
