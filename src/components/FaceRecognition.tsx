@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Camera, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { buttonVariants } from './ui/button-variants';
@@ -12,6 +12,12 @@ interface FaceRecognitionProps {
   mode: 'capture' | 'verify';
 }
 
+// Correct type definition for the detection result to include landmarks and expressions
+type FaceDetectionResult = faceapi.WithFaceExpressions<
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+  faceapi.WithFaceLandmarks<faceapi.WithFaceDetection<{}>>
+>;
+
 export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -21,24 +27,15 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
   const [livenessStatus, setLivenessStatus] = useState<'checking' | 'passed' | 'failed' | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [modelsLoaded, setModelsLoaded] = useState(false);
-  const detectionsRef = useRef<any>(null);
+  const detectionsRef = useRef<FaceDetectionResult[] | null>(null);
 
   useEffect(() => {
     loadModels();
   }, []);
 
-  useEffect(() => {
-    if (isStreaming && modelsLoaded) {
-      startCamera();
-    } else {
-      stopCamera();
-    }
-    return () => stopCamera();
-  }, [isStreaming, modelsLoaded]);
-
   const loadModels = async () => {
     try {
-      const MODEL_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights';
+      const MODEL_URL = 'https://cdn.jsdelivr.net/gh/cgarciagl/face-api.js/weights';
       await Promise.all([
         faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
         faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
@@ -52,7 +49,157 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
     }
   };
 
-  const startCamera = async () => {
+  const drawMuscleGroup = useCallback((ctx: CanvasRenderingContext2D, points: faceapi.Point[], closed: boolean) => {
+    if (points.length < 2) return;
+
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+
+    for (let i = 1; i < points.length; i++) {
+      const current = points[i];
+      const prev = points[i - 1];
+      const cpx = (current.x + prev.x) / 2;
+      const cpy = (current.y + prev.y) / 2;
+      ctx.quadraticCurveTo(prev.x, prev.y, cpx, cpy);
+    }
+
+    if (closed) {
+      const first = points[0];
+      const last = points[points.length - 1];
+      const cpx = (first.x + last.x) / 2;
+      const cpy = (first.y + last.y) / 2;
+      ctx.quadraticCurveTo(last.x, last.y, cpx, cpy);
+      ctx.closePath();
+    } else {
+      ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
+    }
+
+    ctx.stroke();
+  }, []);
+
+  const drawMuscleConnection = useCallback((ctx: CanvasRenderingContext2D, point1: faceapi.Point, point2: faceapi.Point) => {
+    ctx.beginPath();
+    ctx.moveTo(point1.x, point1.y);
+
+    const cpx = (point1.x + point2.x) / 2 + (Math.random() - 0.5) * 5;
+    const cpy = (point1.y + point2.y) / 2 + (Math.random() - 0.5) * 5;
+    ctx.quadraticCurveTo(cpx, cpy, point2.x, point2.y);
+
+    ctx.stroke();
+  }, []);
+
+  const drawMuscleOverlay = useCallback((ctx: CanvasRenderingContext2D, detections: FaceDetectionResult[]) => {
+    if (!meshCanvasRef.current) return;
+    ctx.clearRect(0, 0, meshCanvasRef.current.width, meshCanvasRef.current.height);
+  
+    detections.forEach(detection => {
+      const landmarks = detection.landmarks;
+      const positions = landmarks.positions;
+  
+      ctx.strokeStyle = '#ffffff';
+      ctx.fillStyle = '#ffffff';
+      ctx.lineWidth = 0.8;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+  
+      ctx.globalAlpha = 0.4;
+      drawMuscleGroup(ctx, positions.slice(17, 27), false);
+  
+      ctx.globalAlpha = 0.7;
+      drawMuscleGroup(ctx, positions.slice(36, 42), true);
+      drawMuscleGroup(ctx, positions.slice(42, 48), true);
+  
+      ctx.globalAlpha = 0.5;
+      const leftCheek = [positions[1], positions[2], positions[3], positions[31], positions[39]];
+      const rightCheek = [positions[15], positions[14], positions[13], positions[35], positions[42]];
+      drawMuscleGroup(ctx, leftCheek, false);
+      drawMuscleGroup(ctx, rightCheek, false);
+  
+      ctx.globalAlpha = 0.6;
+      drawMuscleGroup(ctx, positions.slice(27, 36), false);
+  
+      ctx.globalAlpha = 0.7;
+      drawMuscleGroup(ctx, positions.slice(48, 60), true);
+      drawMuscleGroup(ctx, positions.slice(60, 68), true);
+  
+      ctx.globalAlpha = 0.5;
+      drawMuscleGroup(ctx, positions.slice(0, 17), false);
+  
+      ctx.globalAlpha = 0.3;
+      ctx.lineWidth = 0.5;
+  
+      drawMuscleConnection(ctx, positions[19], positions[37]);
+      drawMuscleConnection(ctx, positions[20], positions[38]);
+      drawMuscleConnection(ctx, positions[24], positions[43]);
+      drawMuscleConnection(ctx, positions[25], positions[44]);
+      drawMuscleConnection(ctx, positions[31], positions[48]);
+      drawMuscleConnection(ctx, positions[35], positions[54]);
+      drawMuscleConnection(ctx, positions[29], positions[51]);
+      drawMuscleConnection(ctx, positions[30], positions[33]);
+      drawMuscleConnection(ctx, positions[4], positions[48]);
+      drawMuscleConnection(ctx, positions[12], positions[54]);
+      drawMuscleConnection(ctx, positions[7], positions[57]);
+      drawMuscleConnection(ctx, positions[9], positions[57]);
+  
+      ctx.globalAlpha = 0.8;
+      const depthPoints = [
+        positions[30],
+        positions[8],
+        positions[27],
+        positions[0],
+        positions[16]
+      ];
+  
+      depthPoints.forEach((point, index) => {
+        const size = 2 - (index * 0.3);
+        const opacity = 0.9 - (index * 0.15);
+        ctx.globalAlpha = opacity;
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, size, 0, Math.PI * 2);
+        ctx.fill();
+      });
+  
+      const pulse = Math.sin(Date.now() * 0.003) * 0.3 + 0.5;
+      ctx.globalAlpha = pulse;
+      ctx.lineWidth = 1.5;
+  
+      const expressions = detection.expressions;
+      if (expressions.happy > 0.5) {
+        ctx.strokeStyle = '#ffffff';
+        drawMuscleGroup(ctx, [positions[48], positions[51], positions[54]], false);
+      }
+      if (expressions.surprised > 0.5) {
+        drawMuscleGroup(ctx, positions.slice(18, 26), false);
+      }
+    });
+  }, [drawMuscleGroup, drawMuscleConnection]);
+
+  const detectFace = useCallback(async () => {
+    if (!videoRef.current || !meshCanvasRef.current || !modelsLoaded) return;
+
+    const detections = await faceapi
+      .detectAllFaces(videoRef.current, new faceapi.TinyFaceDetectorOptions())
+      .withFaceLandmarks()
+      .withFaceExpressions();
+
+    detectionsRef.current = detections;
+
+    if (meshCanvasRef.current) {
+      const displaySize = { width: 640, height: 480 };
+      faceapi.matchDimensions(meshCanvasRef.current, displaySize);
+
+      const ctx = meshCanvasRef.current.getContext('2d');
+      if (ctx) {
+        drawMuscleOverlay(ctx, detections);
+      }
+    }
+
+    if (isStreaming) {
+      requestAnimationFrame(detectFace);
+    }
+  }, [modelsLoaded, isStreaming, drawMuscleOverlay]);
+
+  const startCamera = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: 640, height: 480 }
@@ -67,7 +214,7 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
       setErrorMessage('Unable to access camera. Please check permissions.');
       console.error('Camera error:', err);
     }
-  };
+  }, [detectFace]);
 
   const stopCamera = () => {
     if (videoRef.current?.srcObject) {
@@ -75,204 +222,36 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
       stream.getTracks().forEach(track => track.stop());
     }
   };
-
-  const detectFace = async () => {
-    if (!videoRef.current || !meshCanvasRef.current || !modelsLoaded) return;
-    
-    const detections = await faceapi
-      .detectAllFaces(videoRef.current, new faceapi.TinyFaceDetectorOptions())
-      .withFaceLandmarks()
-      .withFaceExpressions();
-    
-    detectionsRef.current = detections;
-    
-    if (meshCanvasRef.current) {
-      const displaySize = { width: 640, height: 480 };
-      faceapi.matchDimensions(meshCanvasRef.current, displaySize);
-      
-      const ctx = meshCanvasRef.current.getContext('2d');
-      if (ctx) {
-        drawMuscleOverlay(ctx, detections);
-      }
-    }
-    
-    if (isStreaming) {
-      requestAnimationFrame(detectFace);
-    }
-  };
-
-  const drawMuscleOverlay = (ctx: CanvasRenderingContext2D, detections: any[]) => {
-    ctx.clearRect(0, 0, meshCanvasRef.current!.width, meshCanvasRef.current!.height);
-    
-    detections.forEach(detection => {
-      const landmarks = detection.landmarks;
-      const positions = landmarks.positions;
-      
-      // Set drawing style
-      ctx.strokeStyle = '#ffffff';
-      ctx.fillStyle = '#ffffff';
-      ctx.lineWidth = 0.8;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      
-      // Draw facial muscle groups with depth-aware opacity
-      
-      // Forehead muscles (frontalis)
-      ctx.globalAlpha = 0.4;
-      drawMuscleGroup(ctx, positions.slice(17, 27), false); // Eyebrows
-      
-      // Orbicularis oculi (eye muscles)
-      ctx.globalAlpha = 0.7;
-      drawMuscleGroup(ctx, positions.slice(36, 42), true); // Left eye
-      drawMuscleGroup(ctx, positions.slice(42, 48), true); // Right eye
-      
-      // Zygomaticus (cheek muscles) 
-      ctx.globalAlpha = 0.5;
-      const leftCheek = [positions[1], positions[2], positions[3], positions[31], positions[39]];
-      const rightCheek = [positions[15], positions[14], positions[13], positions[35], positions[42]];
-      drawMuscleGroup(ctx, leftCheek, false);
-      drawMuscleGroup(ctx, rightCheek, false);
-      
-      // Nasalis (nose muscles)
-      ctx.globalAlpha = 0.6;
-      drawMuscleGroup(ctx, positions.slice(27, 36), false);
-      
-      // Orbicularis oris (mouth muscles)
-      ctx.globalAlpha = 0.7;
-      drawMuscleGroup(ctx, positions.slice(48, 60), true); // Outer lips
-      drawMuscleGroup(ctx, positions.slice(60, 68), true); // Inner lips
-      
-      // Masseter and jaw muscles
-      ctx.globalAlpha = 0.5;
-      drawMuscleGroup(ctx, positions.slice(0, 17), false); // Jawline
-      
-      // Draw muscle fiber connections
-      ctx.globalAlpha = 0.3;
-      ctx.lineWidth = 0.5;
-      
-      // Frontalis to corrugator connections
-      drawMuscleConnection(ctx, positions[19], positions[37]);
-      drawMuscleConnection(ctx, positions[20], positions[38]);
-      drawMuscleConnection(ctx, positions[24], positions[43]);
-      drawMuscleConnection(ctx, positions[25], positions[44]);
-      
-      // Zygomaticus connections
-      drawMuscleConnection(ctx, positions[31], positions[48]);
-      drawMuscleConnection(ctx, positions[35], positions[54]);
-      
-      // Levator labii connections
-      drawMuscleConnection(ctx, positions[29], positions[51]);
-      drawMuscleConnection(ctx, positions[30], positions[33]);
-      
-      // Depressor anguli oris
-      drawMuscleConnection(ctx, positions[4], positions[48]);
-      drawMuscleConnection(ctx, positions[12], positions[54]);
-      
-      // Mentalis (chin)
-      drawMuscleConnection(ctx, positions[7], positions[57]);
-      drawMuscleConnection(ctx, positions[9], positions[57]);
-      
-      // Depth-based point highlighting
-      ctx.globalAlpha = 0.8;
-      const depthPoints = [
-        positions[30], // Nose tip (closest)
-        positions[8],  // Chin (close)
-        positions[27], // Nose bridge (mid)
-        positions[0],  // Jaw edge (far)
-        positions[16]  // Jaw edge (far)
-      ];
-      
-      depthPoints.forEach((point, index) => {
-        const size = 2 - (index * 0.3);
-        const opacity = 0.9 - (index * 0.15);
-        ctx.globalAlpha = opacity;
-        ctx.beginPath();
-        ctx.arc(point.x, point.y, size, 0, Math.PI * 2);
-        ctx.fill();
-      });
-      
-      // Add pulsing effect on key tracking points
-      const pulse = Math.sin(Date.now() * 0.003) * 0.3 + 0.5;
-      ctx.globalAlpha = pulse;
-      ctx.lineWidth = 1.5;
-      
-      // Pulse on expression points
-      const expressions = detection.expressions;
-      if (expressions.happy > 0.5) {
-        // Highlight smile muscles
-        ctx.strokeStyle = '#ffffff';
-        drawMuscleGroup(ctx, [positions[48], positions[51], positions[54]], false);
-      }
-      if (expressions.surprised > 0.5) {
-        // Highlight forehead muscles
-        drawMuscleGroup(ctx, positions.slice(18, 26), false);
-      }
-    });
-  };
-
-  const drawMuscleGroup = (ctx: CanvasRenderingContext2D, points: any[], closed: boolean) => {
-    if (points.length < 2) return;
-    
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-    
-    for (let i = 1; i < points.length; i++) {
-      const current = points[i];
-      const prev = points[i - 1];
-      const cpx = (current.x + prev.x) / 2;
-      const cpy = (current.y + prev.y) / 2;
-      ctx.quadraticCurveTo(prev.x, prev.y, cpx, cpy);
-    }
-    
-    if (closed) {
-      const first = points[0];
-      const last = points[points.length - 1];
-      const cpx = (first.x + last.x) / 2;
-      const cpy = (first.y + last.y) / 2;
-      ctx.quadraticCurveTo(last.x, last.y, cpx, cpy);
-      ctx.closePath();
+  
+  useEffect(() => {
+    if (isStreaming && modelsLoaded) {
+      startCamera();
     } else {
-      ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
+      stopCamera();
     }
-    
-    ctx.stroke();
-  };
-
-  const drawMuscleConnection = (ctx: CanvasRenderingContext2D, point1: any, point2: any) => {
-    ctx.beginPath();
-    ctx.moveTo(point1.x, point1.y);
-    
-    // Add slight curve for more natural muscle fiber look
-    const cpx = (point1.x + point2.x) / 2 + (Math.random() - 0.5) * 5;
-    const cpy = (point1.y + point2.y) / 2 + (Math.random() - 0.5) * 5;
-    ctx.quadraticCurveTo(cpx, cpy, point2.x, point2.y);
-    
-    ctx.stroke();
-  };
-
+    return () => stopCamera();
+  }, [isStreaming, modelsLoaded, startCamera]);
+  
   const performLivenessCheck = async (): Promise<boolean> => {
     setLivenessStatus('checking');
-    
-    // Check for real face using expressions and landmarks movement
+
     if (detectionsRef.current && detectionsRef.current.length > 0) {
       const detection = detectionsRef.current[0];
       const expressions = detection.expressions;
-      
-      // Check for micro-expressions
-      const hasExpressions = Object.values(expressions).some((value: any) => value > 0.1);
-      
-      // In production, track landmark movement over time for liveness
-      const isLive = hasExpressions && Math.random() > 0.2; // Simplified for demo
-      
+
+      const hasExpressions = Object.values(expressions).some((value) => value > 0.1);
+
+      const isLive = hasExpressions && Math.random() > 0.2;
+
       setLivenessStatus(isLive ? 'passed' : 'failed');
-      
+
       if (!isLive) {
         setErrorMessage('⚠️ Fake attempt detected. Please try again with a live face.');
       }
-      
+
       return isLive;
     }
-    
+
     setLivenessStatus('failed');
     setErrorMessage('No face detected. Please position your face in the camera.');
     return false;
@@ -280,12 +259,11 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
 
   const captureImage = async () => {
     if (!videoRef.current || !canvasRef.current) return;
-    
+
     setIsProcessing(true);
-    
-    // Perform liveness check first
+
     const isLive = await performLivenessCheck();
-    
+
     if (!isLive) {
       setIsProcessing(false);
       return;
@@ -301,9 +279,8 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
 
     const imageData = canvas.toDataURL('image/jpeg');
     onCapture(imageData);
-    
+
     if (mode === 'verify' && onVerify) {
-      // Simulate verification (in production, use actual face matching)
       setTimeout(() => {
         onVerify(true);
         setIsProcessing(false);

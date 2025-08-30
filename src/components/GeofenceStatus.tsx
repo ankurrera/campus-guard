@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from 'react';
 import { MapPin, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { getCurrentLocation, checkGeofence } from '@/lib/geofencing';
