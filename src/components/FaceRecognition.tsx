@@ -57,52 +57,262 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
     const ctx = meshCanvasRef.current.getContext('2d');
     if (!ctx) return;
 
+    let animationTime = 0;
+    const facePoints: any = {};
+    
+    // Initialize facial landmark points with more detail
+    const initializeFacePoints = () => {
+      const centerX = 320;
+      const centerY = 240;
+      
+      // Forehead points
+      facePoints.forehead = [
+        { x: centerX - 80, y: centerY - 120, vx: 0, vy: 0 },
+        { x: centerX - 40, y: centerY - 125, vx: 0, vy: 0 },
+        { x: centerX, y: centerY - 130, vx: 0, vy: 0 },
+        { x: centerX + 40, y: centerY - 125, vx: 0, vy: 0 },
+        { x: centerX + 80, y: centerY - 120, vx: 0, vy: 0 },
+      ];
+      
+      // Eyebrow points
+      facePoints.leftEyebrow = [
+        { x: centerX - 90, y: centerY - 70, vx: 0, vy: 0 },
+        { x: centerX - 70, y: centerY - 75, vx: 0, vy: 0 },
+        { x: centerX - 50, y: centerY - 70, vx: 0, vy: 0 },
+      ];
+      facePoints.rightEyebrow = [
+        { x: centerX + 50, y: centerY - 70, vx: 0, vy: 0 },
+        { x: centerX + 70, y: centerY - 75, vx: 0, vy: 0 },
+        { x: centerX + 90, y: centerY - 70, vx: 0, vy: 0 },
+      ];
+      
+      // Eye contour points
+      facePoints.leftEye = [
+        { x: centerX - 80, y: centerY - 40, vx: 0, vy: 0 },
+        { x: centerX - 70, y: centerY - 45, vx: 0, vy: 0 },
+        { x: centerX - 60, y: centerY - 40, vx: 0, vy: 0 },
+        { x: centerX - 70, y: centerY - 35, vx: 0, vy: 0 },
+      ];
+      facePoints.rightEye = [
+        { x: centerX + 60, y: centerY - 40, vx: 0, vy: 0 },
+        { x: centerX + 70, y: centerY - 45, vx: 0, vy: 0 },
+        { x: centerX + 80, y: centerY - 40, vx: 0, vy: 0 },
+        { x: centerX + 70, y: centerY - 35, vx: 0, vy: 0 },
+      ];
+      
+      // Nose bridge and tip
+      facePoints.nose = [
+        { x: centerX, y: centerY - 30, vx: 0, vy: 0 },
+        { x: centerX, y: centerY, vx: 0, vy: 0 },
+        { x: centerX - 15, y: centerY + 20, vx: 0, vy: 0 },
+        { x: centerX, y: centerY + 25, vx: 0, vy: 0 },
+        { x: centerX + 15, y: centerY + 20, vx: 0, vy: 0 },
+      ];
+      
+      // Cheek muscle points
+      facePoints.leftCheek = [
+        { x: centerX - 100, y: centerY, vx: 0, vy: 0 },
+        { x: centerX - 90, y: centerY + 30, vx: 0, vy: 0 },
+        { x: centerX - 80, y: centerY + 60, vx: 0, vy: 0 },
+      ];
+      facePoints.rightCheek = [
+        { x: centerX + 100, y: centerY, vx: 0, vy: 0 },
+        { x: centerX + 90, y: centerY + 30, vx: 0, vy: 0 },
+        { x: centerX + 80, y: centerY + 60, vx: 0, vy: 0 },
+      ];
+      
+      // Mouth contour
+      facePoints.mouth = [
+        { x: centerX - 40, y: centerY + 80, vx: 0, vy: 0 },
+        { x: centerX - 20, y: centerY + 75, vx: 0, vy: 0 },
+        { x: centerX, y: centerY + 78, vx: 0, vy: 0 },
+        { x: centerX + 20, y: centerY + 75, vx: 0, vy: 0 },
+        { x: centerX + 40, y: centerY + 80, vx: 0, vy: 0 },
+        { x: centerX + 20, y: centerY + 85, vx: 0, vy: 0 },
+        { x: centerX, y: centerY + 87, vx: 0, vy: 0 },
+        { x: centerX - 20, y: centerY + 85, vx: 0, vy: 0 },
+      ];
+      
+      // Jawline points
+      facePoints.jawline = [
+        { x: centerX - 100, y: centerY - 20, vx: 0, vy: 0 },
+        { x: centerX - 95, y: centerY + 40, vx: 0, vy: 0 },
+        { x: centerX - 80, y: centerY + 100, vx: 0, vy: 0 },
+        { x: centerX - 40, y: centerY + 140, vx: 0, vy: 0 },
+        { x: centerX, y: centerY + 150, vx: 0, vy: 0 },
+        { x: centerX + 40, y: centerY + 140, vx: 0, vy: 0 },
+        { x: centerX + 80, y: centerY + 100, vx: 0, vy: 0 },
+        { x: centerX + 95, y: centerY + 40, vx: 0, vy: 0 },
+        { x: centerX + 100, y: centerY - 20, vx: 0, vy: 0 },
+      ];
+    };
+    
+    initializeFacePoints();
+    
+    // Animate points with micro-movements
+    const animatePoints = () => {
+      Object.keys(facePoints).forEach(feature => {
+        facePoints[feature].forEach((point: any, i: number) => {
+          // Add subtle breathing animation
+          const breathingOffset = Math.sin(animationTime * 0.001) * 2;
+          
+          // Add micro-expressions
+          if (feature === 'leftEyebrow' || feature === 'rightEyebrow') {
+            // Eyebrow lift simulation
+            point.vy = Math.sin(animationTime * 0.002 + i) * 1.5;
+          } else if (feature === 'leftEye' || feature === 'rightEye') {
+            // Blink simulation
+            if (Math.random() < 0.002) {
+              point.vy = 3;
+            }
+            point.vy *= 0.9;
+          } else if (feature === 'mouth') {
+            // Subtle smile movements
+            const smileOffset = Math.sin(animationTime * 0.0015) * 0.5;
+            point.vx = smileOffset * (i < 4 ? -1 : 1);
+          } else if (feature === 'leftCheek' || feature === 'rightCheek') {
+            // Cheek muscle movement
+            point.vx = Math.sin(animationTime * 0.001 + i) * 0.8;
+            point.vy = Math.cos(animationTime * 0.001 + i) * 0.5 + breathingOffset * 0.3;
+          } else if (feature === 'jawline') {
+            // Jaw muscle tension
+            point.vx = Math.sin(animationTime * 0.0008 + i * 0.5) * 0.5;
+            point.vy = breathingOffset * 0.5;
+          }
+          
+          // Apply velocity with damping
+          point.x += point.vx;
+          point.y += point.vy;
+          point.vx *= 0.95;
+          point.vy *= 0.95;
+        });
+      });
+    };
+    
+    // Draw smooth muscle fiber lines
+    const drawMuscleLines = (points: any[], closed = false) => {
+      if (points.length < 2) return;
+      
+      ctx.beginPath();
+      
+      // Use quadratic curves for smooth lines
+      ctx.moveTo(points[0].x, points[0].y);
+      
+      for (let i = 1; i < points.length - 1; i++) {
+        const cp = points[i];
+        const next = points[i + 1];
+        const midX = (cp.x + next.x) / 2;
+        const midY = (cp.y + next.y) / 2;
+        ctx.quadraticCurveTo(cp.x, cp.y, midX, midY);
+      }
+      
+      if (closed) {
+        const last = points[points.length - 1];
+        const first = points[0];
+        const midX = (last.x + first.x) / 2;
+        const midY = (last.y + first.y) / 2;
+        ctx.quadraticCurveTo(last.x, last.y, midX, midY);
+        ctx.quadraticCurveTo(first.x, first.y, first.x, first.y);
+      } else {
+        const last = points[points.length - 1];
+        ctx.lineTo(last.x, last.y);
+      }
+      
+      ctx.stroke();
+    };
+    
+    // Draw connecting muscle fibers between features
+    const drawConnectingFibers = () => {
+      // Forehead to eyebrows
+      facePoints.forehead.forEach((fp: any, i: number) => {
+        if (i < 3) {
+          const eyebrowPoint = facePoints.leftEyebrow[Math.min(i, facePoints.leftEyebrow.length - 1)];
+          drawMuscleLines([fp, eyebrowPoint]);
+        } else {
+          const eyebrowPoint = facePoints.rightEyebrow[Math.min(i - 2, facePoints.rightEyebrow.length - 1)];
+          drawMuscleLines([fp, eyebrowPoint]);
+        }
+      });
+      
+      // Eyebrows to eyes
+      facePoints.leftEyebrow.forEach((bp: any, i: number) => {
+        const eyePoint = facePoints.leftEye[Math.min(i, facePoints.leftEye.length - 1)];
+        drawMuscleLines([bp, eyePoint]);
+      });
+      facePoints.rightEyebrow.forEach((bp: any, i: number) => {
+        const eyePoint = facePoints.rightEye[Math.min(i, facePoints.rightEye.length - 1)];
+        drawMuscleLines([bp, eyePoint]);
+      });
+      
+      // Nose to cheeks
+      const noseCenter = facePoints.nose[1];
+      drawMuscleLines([noseCenter, facePoints.leftCheek[0]]);
+      drawMuscleLines([noseCenter, facePoints.rightCheek[0]]);
+      
+      // Cheeks to mouth corners
+      drawMuscleLines([facePoints.leftCheek[2], facePoints.mouth[0]]);
+      drawMuscleLines([facePoints.rightCheek[2], facePoints.mouth[4]]);
+      
+      // Jawline to mouth
+      drawMuscleLines([facePoints.jawline[3], facePoints.mouth[7]]);
+      drawMuscleLines([facePoints.jawline[5], facePoints.mouth[3]]);
+    };
+
     const drawLoop = () => {
       if (!isStreaming) return;
       
+      animationTime++;
+      animatePoints();
+      
       ctx.clearRect(0, 0, meshCanvasRef.current!.width, meshCanvasRef.current!.height);
       
-      // Simulated face mesh points (in production, use face detection library)
-      const points = [
-        { x: 320, y: 150 }, // Top center
-        { x: 220, y: 200 }, // Left eye
-        { x: 420, y: 200 }, // Right eye
-        { x: 320, y: 280 }, // Nose
-        { x: 270, y: 350 }, // Left mouth
-        { x: 370, y: 350 }, // Right mouth
-        { x: 320, y: 400 }, // Chin
-      ];
-
-      // Draw white mesh lines
+      // Set drawing style for muscle fibers
       ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1;
+      ctx.lineWidth = 0.8;
+      ctx.globalAlpha = 0.6;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      
+      // Draw main feature outlines with varying opacity for depth
+      ctx.globalAlpha = 0.4;
+      drawMuscleLines(facePoints.forehead);
+      
+      ctx.globalAlpha = 0.6;
+      drawMuscleLines(facePoints.leftEyebrow);
+      drawMuscleLines(facePoints.rightEyebrow);
+      
       ctx.globalAlpha = 0.8;
-
-      // Connect points with lines
+      drawMuscleLines(facePoints.leftEye, true);
+      drawMuscleLines(facePoints.rightEye, true);
+      
+      ctx.globalAlpha = 0.5;
+      drawMuscleLines(facePoints.nose);
+      
+      ctx.globalAlpha = 0.4;
+      drawMuscleLines(facePoints.leftCheek);
+      drawMuscleLines(facePoints.rightCheek);
+      
+      ctx.globalAlpha = 0.7;
+      drawMuscleLines(facePoints.mouth, true);
+      
+      ctx.globalAlpha = 0.5;
+      drawMuscleLines(facePoints.jawline);
+      
+      // Draw connecting muscle fibers with lower opacity
+      ctx.globalAlpha = 0.3;
+      ctx.lineWidth = 0.5;
+      drawConnectingFibers();
+      
+      // Add pulsing glow effect on key points
+      ctx.globalAlpha = Math.sin(animationTime * 0.05) * 0.2 + 0.3;
+      ctx.fillStyle = '#ffffff';
+      
+      // Pulse on eye centers
       ctx.beginPath();
-      points.forEach((point, i) => {
-        if (i === 0) {
-          ctx.moveTo(point.x, point.y);
-        } else {
-          ctx.lineTo(point.x, point.y);
-        }
-      });
-      ctx.stroke();
-
-      // Draw connection lines for triangulation
-      ctx.beginPath();
-      ctx.moveTo(points[1].x, points[1].y);
-      ctx.lineTo(points[3].x, points[3].y);
-      ctx.lineTo(points[2].x, points[2].y);
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.moveTo(points[3].x, points[3].y);
-      ctx.lineTo(points[4].x, points[4].y);
-      ctx.lineTo(points[5].x, points[5].y);
-      ctx.lineTo(points[3].x, points[3].y);
-      ctx.stroke();
-
+      ctx.arc(facePoints.leftEye[1].x, facePoints.leftEye[1].y, 2, 0, Math.PI * 2);
+      ctx.arc(facePoints.rightEye[1].x, facePoints.rightEye[1].y, 2, 0, Math.PI * 2);
+      ctx.fill();
+      
       requestAnimationFrame(drawLoop);
     };
 
