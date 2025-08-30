@@ -7,9 +7,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabaseClient';
 
 export default function StudentLogin() {
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -19,15 +21,39 @@ export default function StudentLogin() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
+
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email: formData.email,
+      password: formData.password,
+    });
     
-    // Demo login (in production, verify with backend)
-    if (formData.email && formData.password) {
+    setLoading(false);
+
+    if (authError) {
+      toast.error(authError.message);
+      return;
+    }
+
+    if (authData.user) {
+      // Fetch student data from the `students` table
+      const { data: studentData, error: studentError } = await supabase
+        .from('students')
+        .select('*')
+        .eq('user_id', authData.user.id)
+        .single();
+      
+      if (studentError) {
+        toast.error('Failed to fetch student data.');
+        return;
+      }
+      
       toast.success('Login successful!');
       navigate('/student/dashboard');
     } else {
-      toast.error('Please fill all fields');
+      toast.error('Login failed. Please check your credentials.');
     }
   };
 
@@ -87,9 +113,14 @@ export default function StudentLogin() {
           <Button
             type="submit"
             className={cn(buttonVariants({ variant: "royal", size: "lg" }), "w-full")}
+            disabled={loading}
           >
-            <LogIn className="w-4 h-4 mr-2" />
-            Sign In
+            {loading ? 'Logging in...' : (
+              <>
+                <LogIn className="w-4 h-4 mr-2" />
+                Sign In
+              </>
+            )}
           </Button>
         </form>
 

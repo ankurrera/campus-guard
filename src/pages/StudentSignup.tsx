@@ -9,10 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { FaceRecognition } from '@/components/FaceRecognition';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabaseClient';
 
 export default function StudentSignup() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     rollNumber: '',
@@ -28,26 +30,15 @@ export default function StudentSignup() {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
-
-  const handleFaceCapture = (imageData: string) => {
-    setFormData({ ...formData, faceData: imageData });
-    toast.success('Face captured successfully!');
-    setTimeout(() => {
-      toast.success('Registration complete! Redirecting to login...');
-      navigate('/student/login');
-    }, 2000);
-  };
-
-  const handleNext = () => {
+  
+  const handleNext = async () => {
     if (step === 1) {
-      // Validate step 1 fields
       if (!formData.name || !formData.rollNumber || !formData.email) {
         toast.error('Please fill all required fields');
         return;
       }
       setStep(2);
     } else if (step === 2) {
-      // Validate step 2 fields
       if (!formData.class || !formData.section || !formData.password) {
         toast.error('Please fill all required fields');
         return;
@@ -56,8 +47,64 @@ export default function StudentSignup() {
         toast.error('Passwords do not match');
         return;
       }
-      setStep(3);
+
+      setLoading(true);
+
+      const { data, error } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+      });
+
+      setLoading(false);
+
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+
+      if (data.user) {
+        toast.success('Successfully created an account! Now, please register your face.');
+        setStep(3);
+      }
     }
+  };
+
+  const handleFaceCapture = async (imageData: string) => {
+    setLoading(true);
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      toast.error('User not authenticated.');
+      setLoading(false);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('students')
+      .insert([
+        {
+          user_id: user.id,
+          name: formData.name,
+          roll_number: formData.rollNumber,
+          email: formData.email,
+          phone: formData.phone,
+          class: formData.class,
+          section: formData.section,
+          face_data: imageData,
+        },
+      ]);
+      
+    setLoading(false);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    toast.success('Face captured and registration complete! Redirecting to login...');
+    setTimeout(() => {
+      navigate('/student/login');
+    }, 2000);
   };
 
   return (
@@ -165,8 +212,9 @@ export default function StudentSignup() {
               <Button
                 onClick={handleNext}
                 className={cn(buttonVariants({ variant: "royal", size: "lg" }), "w-full")}
+                disabled={loading}
               >
-                Next Step
+                {loading ? 'Please wait...' : 'Next Step'}
               </Button>
             </div>
           )}
@@ -260,8 +308,9 @@ export default function StudentSignup() {
                 <Button
                   onClick={handleNext}
                   className={cn(buttonVariants({ variant: "royal", size: "lg" }), "flex-1")}
+                  disabled={loading}
                 >
-                  Next Step
+                  {loading ? 'Please wait...' : 'Next Step'}
                 </Button>
               </div>
             </div>
@@ -285,6 +334,7 @@ export default function StudentSignup() {
                 variant="outline"
                 size="lg"
                 className="w-full"
+                disabled={loading}
               >
                 Previous Step
               </Button>
