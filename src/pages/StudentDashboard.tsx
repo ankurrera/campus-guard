@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Calendar, Clock, MapPin, User, Camera, FileDown, TrendingUp } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Calendar, Clock, MapPin, User, Camera, FileDown, TrendingUp, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { buttonVariants } from '@/components/ui/button-variants';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,8 +8,10 @@ import { FaceRecognition } from '@/components/FaceRecognition';
 import { GeofenceStatus } from '@/components/GeofenceStatus';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabaseClient';
+import { useNavigate } from 'react-router-dom';
 
-// Demo geofences
+// Demo geofences - In production, fetch from database
 const campusGeofences = [
   {
     type: 'radius' as const,
@@ -20,9 +22,114 @@ const campusGeofences = [
 ];
 
 export default function StudentDashboard() {
+  const navigate = useNavigate();
   const [isMarkingAttendance, setIsMarkingAttendance] = useState(false);
   const [locationVerified, setLocationVerified] = useState(false);
   const [attendanceMarked, setAttendanceMarked] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [studentInfo, setStudentInfo] = useState<any>(null);
+  const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
+  const [attendanceStats, setAttendanceStats] = useState({
+    total: 0,
+    present: 0,
+    percentage: 0,
+  });
+
+  useEffect(() => {
+    fetchStudentData();
+    fetchAttendanceData();
+    checkTodayAttendance();
+  }, []);
+
+  const fetchStudentData = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        navigate('/student/login');
+        return;
+      }
+
+      const { data: student, error } = await supabase
+        .from('students')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error) throw error;
+      setStudentInfo(student);
+    } catch (error) {
+      console.error('Error fetching student data:', error);
+      toast.error('Failed to load student information');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchAttendanceData = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: student } = await supabase
+        .from('students')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!student) return;
+
+      const { data: records, error } = await supabase
+        .from('attendance_records')
+        .select('*')
+        .eq('student_id', student.id)
+        .order('date', { ascending: false });
+
+      if (error) throw error;
+
+      setAttendanceRecords(records || []);
+      
+      // Calculate stats
+      const total = records?.length || 0;
+      const present = records?.filter(r => r.status === 'present').length || 0;
+      const percentage = total > 0 ? Math.round((present / total) * 100) : 0;
+      
+      setAttendanceStats({ total, present, percentage });
+    } catch (error) {
+      console.error('Error fetching attendance:', error);
+    }
+  };
+
+  const checkTodayAttendance = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: student } = await supabase
+        .from('students')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!student) return;
+
+      const today = new Date().toISOString().split('T')[0];
+      
+      const { data, error } = await supabase
+        .from('attendance_records')
+        .select('*')
+        .eq('student_id', student.id)
+        .eq('date', today)
+        .single();
+
+      if (data) {
+        setAttendanceMarked(true);
+      }
+    } catch (error) {
+      // No attendance for today
+      setAttendanceMarked(false);
+    }
+  };
 
   const handleLocationVerified = (verified: boolean) => {
     setLocationVerified(verified);
@@ -32,41 +139,73 @@ export default function StudentDashboard() {
     }
   };
 
-  const handleFaceVerified = (verified: boolean) => {
-    if (verified && locationVerified) {
-      setAttendanceMarked(true);
-      toast.success('Attendance marked successfully!');
-      setIsMarkingAttendance(false);
+  const handleFaceVerified = async (verified: boolean) => {
+    if (verified && locationVerified && studentInfo) {
+      try {
+        // Save attendance record to database
+        const { error } = await supabase
+          .from('attendance_records')
+          .insert({
+            student_id: studentInfo.id,
+            date: new Date().toISOString().split('T')[0],
+            check_in_time: new Date().toISOString(),
+            status: 'present',
+            verification_method: 'biometric',
+            location: {
+              lat: 28.6139,
+              lng: 77.2090,
+              accuracy: 10
+            }
+          });
+
+        if (error) throw error;
+
+        setAttendanceMarked(true);
+        toast.success('Attendance marked successfully!');
+        setIsMarkingAttendance(false);
+        
+        // Refresh attendance data
+        fetchAttendanceData();
+        checkTodayAttendance();
+      } catch (error) {
+        console.error('Error marking attendance:', error);
+        toast.error('Failed to mark attendance');
+      }
     }
   };
 
-  // Demo data
-  const studentInfo = {
-    name: 'John Doe',
-    rollNumber: '2024001',
-    class: 'CSE 3rd Year',
-    section: 'A',
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      navigate('/student/login');
+    } catch (error) {
+      console.error('Error logging out:', error);
+      toast.error('Failed to logout');
+    }
   };
 
-  const attendanceStats = {
-    total: 120,
-    present: 108,
-    percentage: 90,
-  };
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-foreground">Loading...</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-dark">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="glass-card border-b">
+      <header className="glass-card border-b border-border/50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold gradient-text">Student Portal</h1>
+            <h1 className="text-2xl font-light text-foreground">Student Portal</h1>
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" className="text-foreground">
                 <User className="w-4 h-4 mr-2" />
                 Profile
               </Button>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={handleLogout} className="text-foreground border-foreground/20">
+                <LogOut className="w-4 h-4 mr-2" />
                 Logout
               </Button>
             </div>
@@ -77,201 +216,223 @@ export default function StudentDashboard() {
       <div className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Student Info Card */}
-          <Card className="glass-card fade-in">
+          <Card className="glass-card border-foreground/10 fade-in">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="w-5 h-5 text-primary" />
+              <CardTitle className="flex items-center gap-2 text-foreground">
+                <User className="w-5 h-5" />
                 Student Information
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div>
                 <p className="text-sm text-muted-foreground">Name</p>
-                <p className="font-semibold">{studentInfo.name}</p>
+                <p className="font-semibold text-foreground">{studentInfo?.name || 'N/A'}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Roll Number</p>
-                <p className="font-semibold">{studentInfo.rollNumber}</p>
+                <p className="font-semibold text-foreground">{studentInfo?.roll_number || 'N/A'}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Class & Section</p>
-                <p className="font-semibold">{studentInfo.class} - {studentInfo.section}</p>
+                <p className="font-semibold text-foreground">
+                  {studentInfo?.class || 'N/A'} - {studentInfo?.section || 'N/A'}
+                </p>
               </div>
               <Button
                 variant="outline"
                 size="sm"
-                className="w-full mt-4"
+                className="w-full border-foreground/20 text-foreground hover:bg-foreground hover:text-background"
               >
-                <Camera className="w-4 h-4 mr-2" />
-                Update Face Data
+                <FileDown className="w-4 h-4 mr-2" />
+                Download ID Card
               </Button>
             </CardContent>
           </Card>
 
           {/* Attendance Stats */}
-          <Card className="glass-card fade-in">
+          <Card className="glass-card border-foreground/10 fade-in">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-primary" />
+              <CardTitle className="flex items-center gap-2 text-foreground">
+                <TrendingUp className="w-5 h-5" />
                 Attendance Overview
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-sm text-muted-foreground">Overall Attendance</span>
-                  <span className="text-sm font-semibold">{attendanceStats.percentage}%</span>
+              <div className="text-center">
+                <div className="text-4xl font-bold text-foreground mb-2">
+                  {attendanceStats.percentage}%
                 </div>
-                <Progress value={attendanceStats.percentage} className="h-2" />
+                <p className="text-sm text-muted-foreground">Overall Attendance</p>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-center p-3 bg-success/10 rounded-lg">
-                  <p className="text-2xl font-bold text-success">{attendanceStats.present}</p>
-                  <p className="text-xs text-muted-foreground">Present</p>
+              <Progress value={attendanceStats.percentage} className="h-2" />
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Total Classes</p>
+                  <p className="font-semibold text-foreground">{attendanceStats.total}</p>
                 </div>
-                <div className="text-center p-3 bg-destructive/10 rounded-lg">
-                  <p className="text-2xl font-bold text-destructive">{attendanceStats.total - attendanceStats.present}</p>
-                  <p className="text-xs text-muted-foreground">Absent</p>
+                <div>
+                  <p className="text-muted-foreground">Present</p>
+                  <p className="font-semibold text-foreground">{attendanceStats.present}</p>
                 </div>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full"
-              >
-                <FileDown className="w-4 h-4 mr-2" />
-                Download Report
-              </Button>
+              {attendanceStats.percentage < 75 && (
+                <div className="p-3 bg-destructive/10 rounded-lg">
+                  <p className="text-sm text-destructive">
+                    Warning: Your attendance is below 75%
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
-          {/* Today's Status */}
-          <Card className="glass-card fade-in">
+          {/* Mark Attendance Card */}
+          <Card className="glass-card border-foreground/10 fade-in">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-primary" />
-                Today's Status
+              <CardTitle className="flex items-center gap-2 text-foreground">
+                <Camera className="w-5 h-5" />
+                Today's Attendance
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Date</span>
-                  <span className="font-semibold">{new Date().toLocaleDateString()}</span>
+                  <span className="font-semibold text-foreground">
+                    {new Date().toLocaleDateString()}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Status</span>
                   <span className={cn(
-                    "px-2 py-1 rounded-full text-xs font-semibold",
-                    attendanceMarked
-                      ? "bg-success/20 text-success"
-                      : "bg-warning/20 text-warning"
+                    "font-semibold",
+                    attendanceMarked ? "text-success" : "text-warning"
                   )}>
-                    {attendanceMarked ? 'Present' : 'Not Marked'}
+                    {attendanceMarked ? 'Marked' : 'Pending'}
                   </span>
                 </div>
+                
+                {!attendanceMarked && (
+                  <Button
+                    onClick={() => setIsMarkingAttendance(true)}
+                    className="w-full bg-foreground text-background hover:bg-foreground/90"
+                    disabled={isMarkingAttendance}
+                  >
+                    <Camera className="w-4 h-4 mr-2" />
+                    Mark Attendance
+                  </Button>
+                )}
+                
                 {attendanceMarked && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Check-in Time</span>
-                    <span className="font-semibold">{new Date().toLocaleTimeString()}</span>
+                  <div className="p-3 bg-success/10 rounded-lg">
+                    <p className="text-sm text-success text-center">
+                      ✓ Attendance marked successfully
+                    </p>
                   </div>
                 )}
               </div>
-              
-              {!attendanceMarked && (
-                <Button
-                  onClick={() => setIsMarkingAttendance(true)}
-                  className={cn(buttonVariants({ variant: "royal" }), "w-full mt-6")}
-                  disabled={isMarkingAttendance}
-                >
-                  <Camera className="w-4 h-4 mr-2" />
-                  Mark Attendance
-                </Button>
-              )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Attendance Marking Section */}
-        {isMarkingAttendance && !attendanceMarked && (
-          <div className="mt-8 space-y-6">
-            <h2 className="text-2xl font-bold">Mark Your Attendance</h2>
-            
-            {/* Step 1: Location Verification */}
-            <div className="glass-card rounded-xl p-6 fade-in">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-primary" />
-                Step 1: Location Verification
-              </h3>
-              <GeofenceStatus
-                geofences={campusGeofences}
-                onLocationVerified={handleLocationVerified}
-              />
-            </div>
+        {/* Attendance Marking Modal */}
+        {isMarkingAttendance && (
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <Card className="w-full max-w-2xl glass-card border-foreground/20">
+              <CardHeader>
+                <CardTitle className="text-foreground">Mark Attendance</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Step 1: Location Verification */}
+                <div>
+                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2 text-foreground">
+                    <MapPin className="w-4 h-4" />
+                    Step 1: Location Verification
+                  </h3>
+                  <GeofenceStatus
+                    geofences={campusGeofences}
+                    onLocationVerified={handleLocationVerified}
+                  />
+                </div>
 
-            {/* Step 2: Face Recognition */}
-            {locationVerified && (
-              <div className="glass-card rounded-xl p-6 fade-in">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <Camera className="w-5 h-5 text-primary" />
-                  Step 2: Face Recognition
-                </h3>
-                <FaceRecognition
-                  mode="verify"
-                  onCapture={() => {}}
-                  onVerify={handleFaceVerified}
-                />
-              </div>
-            )}
+                {/* Step 2: Face Verification */}
+                {locationVerified && (
+                  <div>
+                    <h3 className="text-sm font-semibold mb-3 flex items-center gap-2 text-foreground">
+                      <Camera className="w-4 h-4" />
+                      Step 2: Face Verification
+                    </h3>
+                    <FaceRecognition
+                      mode="capture"
+                      onCapture={(imageData) => handleFaceVerified(true)}
+                    />
+                  </div>
+                )}
 
-            <Button
-              onClick={() => setIsMarkingAttendance(false)}
-              variant="outline"
-              className="w-full"
-            >
-              Cancel
-            </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsMarkingAttendance(false)}
+                  className="w-full border-foreground/20 text-foreground"
+                >
+                  Cancel
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         )}
 
-        {/* Recent Attendance */}
-        <div className="mt-8">
-          <h2 className="text-2xl font-bold mb-4">Recent Attendance</h2>
-          <Card className="glass-card">
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="border-b">
-                    <tr>
-                      <th className="text-left p-4 font-medium">Date</th>
-                      <th className="text-left p-4 font-medium">Check In</th>
-                      <th className="text-left p-4 font-medium">Check Out</th>
-                      <th className="text-left p-4 font-medium">Status</th>
-                      <th className="text-left p-4 font-medium">Location</th>
+        {/* Recent Attendance History */}
+        <Card className="glass-card border-foreground/10 mt-6 fade-in">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-foreground">
+              <Calendar className="w-5 h-5" />
+              Recent Attendance History
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-foreground/10">
+                    <th className="text-left py-2 text-sm font-semibold text-foreground">Date</th>
+                    <th className="text-left py-2 text-sm font-semibold text-foreground">Check-in</th>
+                    <th className="text-left py-2 text-sm font-semibold text-foreground">Status</th>
+                    <th className="text-left py-2 text-sm font-semibold text-foreground">Method</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {attendanceRecords.slice(0, 10).map((record, index) => (
+                    <tr key={index} className="border-b border-foreground/5">
+                      <td className="py-2 text-sm text-foreground">
+                        {new Date(record.date).toLocaleDateString()}
+                      </td>
+                      <td className="py-2 text-sm text-muted-foreground">
+                        {new Date(record.check_in_time).toLocaleTimeString()}
+                      </td>
+                      <td className="py-2">
+                        <span className={cn(
+                          "text-xs px-2 py-1 rounded-full",
+                          record.status === 'present' 
+                            ? "bg-success/10 text-success" 
+                            : "bg-destructive/10 text-destructive"
+                        )}>
+                          {record.status}
+                        </span>
+                      </td>
+                      <td className="py-2 text-sm text-muted-foreground">
+                        {record.verification_method}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {[...Array(5)].map((_, i) => (
-                      <tr key={i} className="border-b hover:bg-muted/50 transition-colors">
-                        <td className="p-4">{new Date(Date.now() - i * 86400000).toLocaleDateString()}</td>
-                        <td className="p-4">09:00 AM</td>
-                        <td className="p-4">05:00 PM</td>
-                        <td className="p-4">
-                          <span className="px-2 py-1 rounded-full text-xs font-semibold bg-success/20 text-success">
-                            Present
-                          </span>
-                        </td>
-                        <td className="p-4">
-                          <span className="text-xs text-muted-foreground">On Campus</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                  ))}
+                </tbody>
+              </table>
+              {attendanceRecords.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  No attendance records found
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
