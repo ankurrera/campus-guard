@@ -2,25 +2,29 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Starfield } from "@/components/Starfield";
 import { ArrowRight, Sparkles, Shield, Globe } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile"; // Import the hook
 
 const Index = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile(); // Use the hook to detect mobile devices
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
-      {/* 3D Model Background Container */}
-      <div className="absolute inset-x-0 top-0 z-0 h-[50vh] w-full pointer-events-auto flex items-center justify-center">
-        <iframe 
-          src='https://my.spline.design/thresholddarkambientui-ZwwyUnGJwL4wO3tkhnJSWJ4S/' 
-          frameBorder='0' 
-          width='100%' 
-          height='100%'
-          className="pointer-events-auto transform scale-[1.6] translate-y-16" // Adjusted translate-y-16 to move it down
-        ></iframe>
-      </div>
+      {/* Conditionally render the 3D model only on non-mobile devices */}
+      {!isMobile && (
+        <div className="absolute inset-x-0 top-0 z-0 h-[50vh] w-full pointer-events-auto flex items-center justify-center">
+          <iframe 
+            src='https://my.spline.design/thresholddarkambientui-ZwwyUnGJwL4wO3tkhnJSWJ4S/' 
+            frameBorder='0' 
+            width='100%' 
+            height='100%'
+            className="pointer-events-auto transform scale-[1.6] translate-y-16"
+          ></iframe>
+        </div>
+      )}
 
-      {/* Existing Starfield component is still here, but the iframe will be its "sibling" in the DOM, so you can control their layering with z-index if needed. */}
-      {/* <Starfield /> */}
+      {/* Conditionally render Starfield for desktop to avoid performance issues on mobile */}
+      {!isMobile && <Starfield />}
 
       <div className="relative z-10 w-full h-full pointer-events-none">
         {/* Navigation */}
