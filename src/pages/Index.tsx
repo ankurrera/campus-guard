@@ -9,7 +9,7 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
       {/* 3D Model Background Container */}
-      <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-auto">
+      <div className="absolute inset-0 z-0 flex items-center justify-center">
         <iframe 
           src='https://my.spline.design/thresholddarkambientui-gGVFgwyFF8YCFCzUAS48tnrF/' 
           frameBorder='0' 
@@ -56,14 +56,14 @@ const Index = () => {
               </span>
             </div>
             
-            <h1 className="text-6xl md:text-8xl lg:text-9xl font-light text-foreground leading-[0.9] mb-12 pointer-events-auto">
+            <h1 className="text-6xl md:text-8xl lg:text-9xl font-light text-foreground leading-[0.9] mb-12">
               Biometric
               <br />
               <span className="italic font-extralight">Attendance</span>
             </h1>
             
             <div className="flex items-start gap-16 mb-16">
-              <div className="text-muted-foreground max-w-md pointer-events-auto">
+              <div className="text-muted-foreground max-w-md">
                 <p className="text-lg leading-relaxed">
                   Revolutionary attendance management through advanced facial recognition, 
                   real-time GPS verification, and intelligent anti-spoofing technology.
@@ -82,7 +82,7 @@ const Index = () => {
             </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 py-12 border-t border-foreground/10 pointer-events-auto">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 py-12 border-t border-foreground/10">
               <div>
                 <div className="text-4xl font-light text-foreground mb-2">99.9%</div>
                 <div className="text-xs text-muted-foreground tracking-wider uppercase">Accuracy</div>
@@ -104,7 +104,7 @@ const Index = () => {
         </div>
 
         {/* Features Section */}
-        <div className="container mx-auto px-8 py-20 pointer-events-auto">
+        <div className="container mx-auto px-8 py-20">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
             <div className="group">
               <div className="mb-6">
@@ -148,7 +148,7 @@ const Index = () => {
         </div>
 
         {/* CTA Section */}
-        <div className="container mx-auto px-8 py-20 pointer-events-auto">
+        <div className="container mx-auto px-8 py-20">
           <div className="border-t border-foreground/10 pt-20">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
               <div>
@@ -163,7 +163,7 @@ const Index = () => {
                   variant="default"
                   size="lg"
                   onClick={() => navigate("/admin/login")}
-                  className="bg-foreground text-background hover:bg-foreground/90 px-8"
+                  className="bg-foreground text-background hover:bg-foreground/90 px-8 pointer-events-auto"
                 >
                   Admin Portal
                 </Button>
