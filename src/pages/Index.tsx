@@ -9,18 +9,15 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
       {/* 3D Model Background Container */}
-      <div className="absolute inset-x-0 top-0 z-0 h-[50vh] w-full pointer-events-auto">
+      <div className="absolute inset-x-0 top-0 z-0 h-[50vh] w-full pointer-events-auto flex items-center justify-center">
         <iframe 
           src='https://my.spline.design/thresholddarkambientui-ZwwyUnGJwL4wO3tkhnJSWJ4S/' 
           frameBorder='0' 
           width='100%' 
           height='100%'
-          className="pointer-events-auto"
+          className="pointer-events-auto transform scale-140"
         ></iframe>
       </div>
-
-      {/* Overlay to hide the "build with spline" watermark using a blurred effect */}
-      <div className="absolute bottom-4 right-4 z-10 w-48 h-16 bg-background/50 backdrop-blur-sm rounded-lg pointer-events-none"></div>
 
       {/* Existing Starfield component is still here, but the iframe will be its "sibling" in the DOM, so you can control their layering with z-index if needed. */}
       {/* <Starfield /> */}
