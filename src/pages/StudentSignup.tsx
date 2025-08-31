@@ -15,7 +15,6 @@ export default function StudentSignup() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     rollNumber: '',
@@ -54,6 +53,9 @@ export default function StudentSignup() {
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/student/dashboard`
+        }
       });
 
       setLoading(false);
@@ -64,7 +66,6 @@ export default function StudentSignup() {
       }
 
       if (data.user) {
-        setUserId(data.user.id);
         toast.success('Successfully created an account! Now, please register your face.');
         setStep(3);
       }
@@ -73,9 +74,12 @@ export default function StudentSignup() {
 
   const handleFaceCapture = async (imageData: string) => {
     setLoading(true);
-    
-    if (!userId) {
-      toast.error('User not authenticated. Please try again from the beginning.');
+
+    // Fetch the current authenticated user's session
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      toast.error('Authentication error. Please log in again.');
       setLoading(false);
       return;
     }
@@ -84,7 +88,7 @@ export default function StudentSignup() {
       .from('students')
       .insert([
         {
-          user_id: userId,
+          user_id: user.id, // Use the real-time user ID from the session
           name: formData.name,
           roll_number: formData.rollNumber,
           email: formData.email,
