@@ -15,7 +15,7 @@ const Index = () => {
           frameBorder='0' 
           width='100%' 
           height='100%'
-          className="pointer-events-auto transform scale-140"
+          className="pointer-events-auto transform scale-[1.6]"
         ></iframe>
       </div>
 
