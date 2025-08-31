@@ -9,12 +9,12 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
       {/* 3D Model Background Container */}
-      <div className="absolute inset-0 z-0 flex items-center justify-center">
+      <div className="absolute inset-x-0 top-0 z-0 h-[50vh] w-full pointer-events-auto">
         <iframe 
           src='https://my.spline.design/thresholddarkambientui-gGVFgwyFF8YCFCzUAS48tnrF/' 
           frameBorder='0' 
-          width='1280' 
-          height='720'
+          width='100%' 
+          height='100%'
           className="pointer-events-auto"
         ></iframe>
       </div>
