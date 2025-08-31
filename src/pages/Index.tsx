@@ -19,6 +19,9 @@ const Index = () => {
         ></iframe>
       </div>
 
+      {/* Overlay to hide the "build with spline" watermark */}
+      <div className="absolute bottom-0 right-0 z-10 w-40 h-10 bg-background pointer-events-none"></div>
+
       {/* Existing Starfield component is still here, but the iframe will be its "sibling" in the DOM, so you can control their layering with z-index if needed. */}
       {/* <Starfield /> */}
 
