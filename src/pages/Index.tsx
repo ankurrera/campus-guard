@@ -11,11 +11,11 @@ const Index = () => {
       {/* 3D Model Background Container */}
       <div className="absolute inset-x-0 top-0 z-0 h-[50vh] w-full pointer-events-auto flex items-center justify-center">
         <iframe 
-          src='https://my.spline.design/thresholddarkambientui-ZwwyUnGJwL4wO3tkhnJSWJ4S/' 
+          src='https://my.spline.design/thresholddarkambientui-ZwwyUnGJwL4wO3tkhnJSW4S/' 
           frameBorder='0' 
           width='100%' 
           height='100%'
-          className="pointer-events-auto transform scale-[1.6]"
+          className="pointer-events-auto transform scale-[1.6] translate-y-16" // Adjusted translate-y-16 to move it down
         ></iframe>
       </div>
 
