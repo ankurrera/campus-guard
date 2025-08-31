@@ -8,8 +8,18 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
-      <Starfield />
-      
+      {/* 3D Model Background */}
+      <iframe 
+        src='https://my.spline.design/thresholddarkambientui-gGVFgwyFF8YCFCzUAS48tnrF/' 
+        frameBorder='0' 
+        width='100%' 
+        height='100%'
+        className="absolute inset-0 w-full h-full z-0"
+      ></iframe>
+
+      {/* Existing Starfield component is still here, but the iframe will be its "sibling" in the DOM, so you can control their layering with z-index if needed. */}
+      {/* <Starfield /> */}
+
       {/* Navigation */}
       <nav className="relative z-10 px-8 py-6">
         <div className="flex justify-between items-center">

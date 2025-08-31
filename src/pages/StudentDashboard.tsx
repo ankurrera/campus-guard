@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Calendar, Clock, MapPin, User, Camera, FileDown, TrendingUp, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { buttonVariants } from '@/components/ui/button-variants';
@@ -9,7 +10,7 @@ import { GeofenceStatus } from '@/components/GeofenceStatus';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
-import { useNavigate } from 'react-router-dom';
+import { Database } from '@/integrations/supabase/types';
 
 // Demo geofences - In production, fetch from database
 const campusGeofences = [
@@ -21,27 +22,24 @@ const campusGeofences = [
   },
 ];
 
+type Student = Database['public']['Tables']['students']['Row'];
+type AttendanceRecord = Database['public']['Tables']['attendance_records']['Row'];
+
 export default function StudentDashboard() {
   const navigate = useNavigate();
   const [isMarkingAttendance, setIsMarkingAttendance] = useState(false);
   const [locationVerified, setLocationVerified] = useState(false);
   const [attendanceMarked, setAttendanceMarked] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [studentInfo, setStudentInfo] = useState<any>(null);
-  const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
+  const [studentInfo, setStudentInfo] = useState<Student | null>(null);
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [attendanceStats, setAttendanceStats] = useState({
     total: 0,
     present: 0,
     percentage: 0,
   });
 
-  useEffect(() => {
-    fetchStudentData();
-    fetchAttendanceData();
-    checkTodayAttendance();
-  }, []);
-
-  const fetchStudentData = async () => {
+  const fetchStudentData = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
@@ -64,9 +62,9 @@ export default function StudentDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [navigate]);
 
-  const fetchAttendanceData = async () => {
+  const fetchAttendanceData = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -98,9 +96,9 @@ export default function StudentDashboard() {
     } catch (error) {
       console.error('Error fetching attendance:', error);
     }
-  };
+  }, []);
 
-  const checkTodayAttendance = async () => {
+  const checkTodayAttendance = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -129,7 +127,13 @@ export default function StudentDashboard() {
       // No attendance for today
       setAttendanceMarked(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchStudentData();
+    fetchAttendanceData();
+    checkTodayAttendance();
+  }, [fetchStudentData, fetchAttendanceData, checkTodayAttendance]);
 
   const handleLocationVerified = (verified: boolean) => {
     setLocationVerified(verified);
