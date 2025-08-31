@@ -54,6 +54,9 @@ export default function StudentSignup() {
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/student/dashboard`
+        }
       });
 
       setLoading(false);
