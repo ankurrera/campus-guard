@@ -42,6 +42,12 @@ const Index = () => {
                 Students
               </button>
               <button 
+                onClick={() => navigate("/ta/login")}
+                className="text-muted-foreground hover:text-foreground transition-colors text-sm tracking-wide"
+              >
+                TA Portal
+              </button>
+              <button 
                 onClick={() => navigate("/admin/login")}
                 className="text-muted-foreground hover:text-foreground transition-colors text-sm tracking-wide"
               >

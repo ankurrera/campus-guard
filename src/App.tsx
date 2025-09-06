@@ -10,6 +10,9 @@ import StudentLogin from "./pages/StudentLogin";
 import StudentDashboard from "./pages/StudentDashboard";
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
+import TALogin from "./pages/TALogin";
+import TASignup from "./pages/TASignup";
+import TADashboard from "./pages/TADashboard";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +29,9 @@ const App = () => (
           <Route path="/student/dashboard" element={<StudentDashboard />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/ta/login" element={<TALogin />} />
+          <Route path="/ta/signup" element={<TASignup />} />
+          <Route path="/ta/dashboard" element={<TADashboard />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
