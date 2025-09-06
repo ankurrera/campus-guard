@@ -1,14 +1,15 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Camera, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { Camera, AlertCircle, CheckCircle, XCircle, Shield, Eye, Move, Layers } from 'lucide-react';
 import { Button } from './ui/button';
 import { buttonVariants } from './ui/button-variants';
 import { Alert, AlertDescription } from './ui/alert';
 import { cn } from '@/lib/utils';
 import * as faceapi from 'face-api.js';
+import { FaceAntiSpoofingAnalyzer, AntiSpoofingResult } from '@/lib/faceAntiSpoofing';
 
 interface FaceRecognitionProps {
-  onCapture: (imageData: string) => void;
-  onVerify?: (verified: boolean) => void;
+  onCapture: (imageData: string, antiSpoofingResult?: AntiSpoofingResult) => void;
+  onVerify?: (verified: boolean, antiSpoofingResult?: AntiSpoofingResult) => void;
   mode: 'capture' | 'verify';
 }
 
@@ -27,7 +28,9 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
   const [livenessStatus, setLivenessStatus] = useState<'checking' | 'passed' | 'failed' | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [antiSpoofingResult, setAntiSpoofingResult] = useState<AntiSpoofingResult | null>(null);
   const detectionsRef = useRef<FaceDetectionResult[] | null>(null);
+  const antiSpoofingAnalyzer = useRef(new FaceAntiSpoofingAnalyzer());
 
   useEffect(() => {
     loadModels();
@@ -269,29 +272,54 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
     return () => stopCamera();
   }, [isStreaming, modelsLoaded, startCamera]);
   
-  const performLivenessCheck = async (): Promise<boolean> => {
+  const performLivenessCheck = async (): Promise<AntiSpoofingResult | null> => {
     setLivenessStatus('checking');
 
-    if (detectionsRef.current && detectionsRef.current.length > 0) {
-      const detection = detectionsRef.current[0];
-      const expressions = detection.expressions;
-
-      const hasExpressions = Object.values(expressions).some((value) => value > 0.1);
-
-      const isLive = hasExpressions && Math.random() > 0.2;
-
-      setLivenessStatus(isLive ? 'passed' : 'failed');
-
-      if (!isLive) {
-        setErrorMessage('⚠️ Fake attempt detected. Please try again with a live face.');
-      }
-
-      return isLive;
+    if (!videoRef.current || !detectionsRef.current || detectionsRef.current.length === 0) {
+      setLivenessStatus('failed');
+      setErrorMessage('No face detected. Please position your face in the camera.');
+      return null;
     }
 
-    setLivenessStatus('failed');
-    setErrorMessage('No face detected. Please position your face in the camera.');
-    return false;
+    try {
+      // Use enhanced anti-spoofing analyzer
+      const result = await antiSpoofingAnalyzer.current.analyze(
+        videoRef.current, 
+        detectionsRef.current.map(detection => ({
+          detection: detection.detection,
+          landmarks: detection.landmarks,
+          expressions: detection.expressions
+        }))
+      );
+
+      setAntiSpoofingResult(result);
+
+      if (result.isLive) {
+        setLivenessStatus('passed');
+        setErrorMessage(null);
+      } else {
+        setLivenessStatus('failed');
+        const spoofingMessages = {
+          'photo': '📷 Photo spoofing detected. Please use a live camera.',
+          'screen': '📱 Screen display detected. Please use a live camera.',
+          'video': '🎥 Video playback detected. Please present yourself live.',
+          'deepfake': '🤖 Deepfake or synthetic media detected.',
+          'multiple_faces': '👥 Multiple faces detected. Only one person allowed.'
+        };
+        
+        setErrorMessage(
+          spoofingMessages[result.spoofingType as keyof typeof spoofingMessages] || 
+          '⚠️ Liveness check failed. Please try again with a live face.'
+        );
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Anti-spoofing analysis failed:', error);
+      setLivenessStatus('failed');
+      setErrorMessage('Security analysis failed. Please try again.');
+      return null;
+    }
   };
 
   const captureImage = async () => {
@@ -299,9 +327,9 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
 
     setIsProcessing(true);
 
-    const isLive = await performLivenessCheck();
+    const spoofingResult = await performLivenessCheck();
 
-    if (!isLive) {
+    if (!spoofingResult || !spoofingResult.isLive) {
       setIsProcessing(false);
       return;
     }
@@ -315,11 +343,11 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
     context.drawImage(videoRef.current, 0, 0);
 
     const imageData = canvas.toDataURL('image/jpeg');
-    onCapture(imageData);
+    onCapture(imageData, spoofingResult);
 
     if (mode === 'verify' && onVerify) {
       setTimeout(() => {
-        onVerify(true);
+        onVerify(true, spoofingResult);
         setIsProcessing(false);
       }, 1000);
     } else {
@@ -387,6 +415,68 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
         )}
         <canvas ref={canvasRef} className="hidden" />
       </div>
+
+      {/* Security Analysis Display */}
+      {antiSpoofingResult && (
+        <div className="glass-card p-4 rounded-xl space-y-3">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Shield className="w-4 h-4 text-primary" />
+            Security Analysis
+          </div>
+          
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="flex items-center gap-2">
+              <Layers className="w-3 h-3" />
+              <span>Depth Analysis:</span>
+              <span className={cn(
+                "font-medium",
+                antiSpoofingResult.details.depthAnalysis > 0.6 ? "text-success" : "text-destructive"
+              )}>
+                {Math.round(antiSpoofingResult.details.depthAnalysis * 100)}%
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Eye className="w-3 h-3" />
+              <span>Texture Quality:</span>
+              <span className={cn(
+                "font-medium",
+                antiSpoofingResult.details.textureAnalysis > 0.6 ? "text-success" : "text-destructive"
+              )}>
+                {Math.round(antiSpoofingResult.details.textureAnalysis * 100)}%
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Move className="w-3 h-3" />
+              <span>Motion Detection:</span>
+              <span className={cn(
+                "font-medium",
+                antiSpoofingResult.details.motionAnalysis > 0.6 ? "text-success" : "text-destructive"
+              )}>
+                {Math.round(antiSpoofingResult.details.motionAnalysis * 100)}%
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-3 h-3" />
+              <span>Overall Score:</span>
+              <span className={cn(
+                "font-medium",
+                antiSpoofingResult.confidence > 0.6 ? "text-success" : "text-destructive"
+              )}>
+                {Math.round(antiSpoofingResult.confidence * 100)}%
+              </span>
+            </div>
+          </div>
+          
+          {antiSpoofingResult.spoofingType && (
+            <div className="mt-2 p-2 bg-destructive/10 rounded text-xs text-destructive">
+              Spoofing type detected: {antiSpoofingResult.spoofingType.replace('_', ' ')}
+            </div>
+          )}
+        </div>
+      )}
 
       {errorMessage && (
         <Alert variant="destructive">

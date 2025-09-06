@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from 'react';
-import { MapPin, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { MapPin, CheckCircle, XCircle, AlertCircle, Shield, Globe, Wifi } from 'lucide-react';
 import { getCurrentLocation, checkGeofence } from '@/lib/geofencing';
+import { LocationSecurityAnalyzer, LocationVerificationResult } from '@/lib/locationSecurity';
 import { Alert, AlertDescription } from './ui/alert';
 import { Button } from './ui/button';
 import { buttonVariants } from './ui/button-variants';
@@ -15,13 +16,14 @@ interface GeofenceStatusProps {
     radius?: number;
     active: boolean;
   }>;
-  onLocationVerified: (verified: boolean, location: { lat: number; lng: number; accuracy: number }) => void;
+  onLocationVerified: (verified: boolean, location: { lat: number; lng: number; accuracy: number }, securityResult?: LocationVerificationResult) => void;
 }
 
 export function GeofenceStatus({ geofences, onLocationVerified }: GeofenceStatusProps) {
   const [locationStatus, setLocationStatus] = useState<'checking' | 'inside' | 'outside' | 'error' | 'denied' | null>(null);
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [securityResult, setSecurityResult] = useState<LocationVerificationResult | null>(null);
 
   const checkLocation = async () => {
     setLocationStatus('checking');
@@ -32,27 +34,59 @@ export function GeofenceStatus({ geofences, onLocationVerified }: GeofenceStatus
       const userLocation = {
         lat: position.coords.latitude,
         lng: position.coords.longitude,
+        accuracy: position.coords.accuracy
       };
       
       setAccuracy(position.coords.accuracy);
+
+      // Enhanced security verification
+      const securityAnalysis = await LocationSecurityAnalyzer.verifyLocation(userLocation);
+      setSecurityResult(securityAnalysis);
 
       // Check if accuracy is acceptable
       if (position.coords.accuracy > 50) {
         setLocationStatus('error');
         setErrorMessage(`Location accuracy is too low (${Math.round(position.coords.accuracy)}m). Please try again or connect to Wi-Fi.`);
-        onLocationVerified(false, { ...userLocation, accuracy: position.coords.accuracy });
+        onLocationVerified(false, userLocation, securityAnalysis);
         return;
       }
 
+      // Check for security violations
+      if (!securityAnalysis.isValid) {
+        setLocationStatus('error');
+        
+        let securityMessage = 'Security verification failed: ';
+        const { fraudIndicators } = securityAnalysis;
+        
+        if (fraudIndicators.vpnDetected) {
+          securityMessage += 'VPN/Proxy detected. ';
+        }
+        if (fraudIndicators.locationSpoofing) {
+          securityMessage += 'Location spoofing detected. ';
+        }
+        if (fraudIndicators.impossibleSpeed) {
+          securityMessage += 'Impossible travel speed detected. ';
+        }
+        if (fraudIndicators.timezoneMismatch) {
+          securityMessage += 'Timezone mismatch detected. ';
+        }
+        
+        securityMessage += 'Please disable VPN and location spoofing tools.';
+        setErrorMessage(securityMessage);
+        onLocationVerified(false, userLocation, securityAnalysis);
+        return;
+      }
+
+      // Check geofence after security verification
       const { isInside } = checkGeofence(userLocation, geofences);
       
       if (isInside) {
         setLocationStatus('inside');
-        onLocationVerified(true, { ...userLocation, accuracy: position.coords.accuracy });
+        onLocationVerified(true, userLocation, securityAnalysis);
       } else {
         setLocationStatus('outside');
         setErrorMessage('You must be on campus to mark attendance.');
-        onLocationVerified(false, { ...userLocation, accuracy: position.coords.accuracy });
+        onLocationVerified(false, userLocation, securityAnalysis);
       }
     } catch (error: any) {
       setLocationStatus('error');
@@ -146,6 +180,87 @@ export function GeofenceStatus({ geofences, onLocationVerified }: GeofenceStatus
           </Button>
         )}
       </div>
+
+      {/* Security Analysis Display */}
+      {securityResult && (
+        <div className="glass-card p-4 rounded-xl space-y-3 mt-4">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Shield className="w-4 h-4 text-primary" />
+            Location Security Analysis
+          </div>
+          
+          <div className="grid grid-cols-1 gap-3 text-sm">
+            <div className="flex items-center justify-between">
+              <span>Security Score:</span>
+              <span className={cn(
+                "font-medium",
+                securityResult.confidence > 0.8 ? "text-success" : 
+                securityResult.confidence > 0.6 ? "text-warning" : "text-destructive"
+              )}>
+                {Math.round(securityResult.confidence * 100)}%
+              </span>
+            </div>
+            
+            {securityResult.distanceDiscrepancy && (
+              <div className="flex items-center justify-between">
+                <span>GPS-IP Distance:</span>
+                <span className={cn(
+                  "font-medium",
+                  securityResult.distanceDiscrepancy < 50000 ? "text-success" : "text-warning"
+                )}>
+                  {Math.round(securityResult.distanceDiscrepancy / 1000)} km
+                </span>
+              </div>
+            )}
+            
+            <div className="space-y-1">
+              <div className="text-xs text-muted-foreground">Security Checks:</div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className={cn(
+                  "flex items-center gap-1",
+                  !securityResult.fraudIndicators.vpnDetected ? "text-success" : "text-destructive"
+                )}>
+                  <Globe className="w-3 h-3" />
+                  {!securityResult.fraudIndicators.vpnDetected ? "No VPN" : "VPN Detected"}
+                </div>
+                
+                <div className={cn(
+                  "flex items-center gap-1",
+                  !securityResult.fraudIndicators.locationSpoofing ? "text-success" : "text-destructive"
+                )}>
+                  <MapPin className="w-3 h-3" />
+                  {!securityResult.fraudIndicators.locationSpoofing ? "GPS Valid" : "GPS Spoofed"}
+                </div>
+                
+                <div className={cn(
+                  "flex items-center gap-1",
+                  !securityResult.fraudIndicators.impossibleSpeed ? "text-success" : "text-destructive"
+                )}>
+                  <Wifi className="w-3 h-3" />
+                  {!securityResult.fraudIndicators.impossibleSpeed ? "Speed OK" : "Impossible Speed"}
+                </div>
+                
+                <div className={cn(
+                  "flex items-center gap-1",
+                  !securityResult.fraudIndicators.timezoneMismatch ? "text-success" : "text-warning"
+                )}>
+                  <AlertCircle className="w-3 h-3" />
+                  {!securityResult.fraudIndicators.timezoneMismatch ? "Timezone OK" : "Timezone Mismatch"}
+                </div>
+              </div>
+            </div>
+            
+            {securityResult.details.ipInfo && (
+              <div className="text-xs text-muted-foreground">
+                ISP: {securityResult.details.ipInfo.isp.substring(0, 30)}...
+                {securityResult.details.ipInfo.city && (
+                  <span> • {securityResult.details.ipInfo.city}, {securityResult.details.ipInfo.country}</span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

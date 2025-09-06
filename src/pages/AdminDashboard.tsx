@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
+import { SecurityDashboard } from '@/components/SecurityDashboard';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { authService, dbService, statsService, getServiceStatus } from '@/lib/dataService';
@@ -220,6 +221,7 @@ export default function AdminDashboard() {
         <Tabs defaultValue="attendance" className="space-y-6">
           <TabsList className="glass-card p-1">
             <TabsTrigger value="attendance">Attendance</TabsTrigger>
+            <TabsTrigger value="security">Security Monitor</TabsTrigger>
             <TabsTrigger value="fraud">Fraud Detection</TabsTrigger>
             <TabsTrigger value="geofence">Geofence Settings</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
@@ -316,6 +318,11 @@ export default function AdminDashboard() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Security Monitor Tab */}
+          <TabsContent value="security" className="space-y-6">
+            <SecurityDashboard />
           </TabsContent>
 
           {/* Fraud Detection Tab */}
