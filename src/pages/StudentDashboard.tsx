@@ -1,16 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Clock, MapPin, User, Camera, FileDown, TrendingUp, LogOut } from 'lucide-react';
+import { Calendar, Clock, MapPin, User, Camera, FileDown, TrendingUp, LogOut, Shield, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { buttonVariants } from '@/components/ui/button-variants';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { FaceRecognition } from '@/components/FaceRecognition';
 import { GeofenceStatus } from '@/components/GeofenceStatus';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { authService, dbService } from '@/lib/dataService';
 import { Database } from '@/integrations/supabase/types';
+import { AntiSpoofingResult } from '@/lib/faceAntiSpoofing';
+import { LocationVerificationResult, DeviceFingerprinting } from '@/lib/locationSecurity';
+import { FraudDetectionEngine } from '@/lib/fraudDetection';
 
 // Demo geofences - In production, fetch from database
 const campusGeofences = [
@@ -38,6 +42,11 @@ export default function StudentDashboard() {
     present: 0,
     percentage: 0,
   });
+  const [deviceFingerprint, setDeviceFingerprint] = useState<string>('');
+  const [securityBlocked, setSecurityBlocked] = useState(false);
+  const [fraudAttemptMessage, setFraudAttemptMessage] = useState<string | null>(null);
+  const [currentFaceResult, setCurrentFaceResult] = useState<AntiSpoofingResult | null>(null);
+  const [currentLocationResult, setCurrentLocationResult] = useState<LocationVerificationResult | null>(null);
 
   const fetchStudentData = useCallback(async () => {
     try {
@@ -141,20 +150,87 @@ export default function StudentDashboard() {
     fetchStudentData();
     fetchAttendanceData();
     checkTodayAttendance();
+    
+    // Generate device fingerprint
+    const fingerprint = DeviceFingerprinting.generateFingerprint();
+    setDeviceFingerprint(fingerprint);
+    
+    // Check if device/IP is blocked
+    const isBlocked = FraudDetectionEngine.isDeviceBlocked(fingerprint);
+    if (isBlocked) {
+      setSecurityBlocked(true);
+      setFraudAttemptMessage('This device has been blocked due to security violations. Please contact administrator.');
+    }
   }, [fetchStudentData, fetchAttendanceData, checkTodayAttendance]);
 
-  const handleLocationVerified = (verified: boolean) => {
+  const handleLocationVerified = (
+    verified: boolean, 
+    location: { lat: number; lng: number; accuracy: number }, 
+    securityResult?: LocationVerificationResult
+  ) => {
     setLocationVerified(verified);
+    setCurrentLocationResult(securityResult || null);
+    
     if (!verified) {
-      toast.error('You must be on campus to mark attendance');
+      if (securityResult) {
+        // Analyze fraud indicators for specific message
+        const { fraudIndicators } = securityResult;
+        let message = 'Location verification failed: ';
+        
+        if (fraudIndicators.vpnDetected) {
+          message += 'VPN or proxy detected. Please disable and try again.';
+        } else if (fraudIndicators.locationSpoofing) {
+          message += 'Location spoofing detected. Please use genuine GPS.';
+        } else if (fraudIndicators.impossibleSpeed) {
+          message += 'Impossible travel speed detected. Please wait before trying again.';
+        } else {
+          message += 'You must be on campus to mark attendance.';
+        }
+        
+        toast.error(message);
+        setFraudAttemptMessage(message);
+      } else {
+        toast.error('You must be on campus to mark attendance');
+      }
       setIsMarkingAttendance(false);
+    } else {
+      setFraudAttemptMessage(null);
     }
   };
 
-  const handleFaceVerified = async (verified: boolean) => {
-    if (verified && locationVerified && studentInfo) {
+  const handleFaceVerified = async (verified: boolean, antiSpoofingResult?: AntiSpoofingResult) => {
+    setCurrentFaceResult(antiSpoofingResult || null);
+    
+    if (verified && locationVerified && studentInfo && currentLocationResult && antiSpoofingResult) {
       try {
-        // Save attendance record to database
+        // Run fraud detection analysis
+        const fraudAnalysis = FraudDetectionEngine.analyzeAttendanceAttempt(
+          studentInfo.id,
+          antiSpoofingResult,
+          currentLocationResult,
+          deviceFingerprint,
+          currentLocationResult.details.ipInfo?.ip
+        );
+        
+        // Check if attempt should be blocked
+        if (fraudAnalysis.shouldBlock) {
+          setSecurityBlocked(true);
+          setFraudAttemptMessage(
+            `Security violation detected: ${fraudAnalysis.fraudIndicators.join(', ')}. ` +
+            'This device has been temporarily blocked. Please contact administrator.'
+          );
+          toast.error('Attendance blocked due to security violation');
+          setIsMarkingAttendance(false);
+          return;
+        }
+        
+        // Log fraud attempt if detected but not blocked
+        if (fraudAnalysis.fraudAttempt) {
+          console.warn('Fraud attempt detected but not blocked:', fraudAnalysis.fraudAttempt);
+          toast.warning(`Security warning: ${fraudAnalysis.fraudIndicators.slice(0, 2).join(', ')}`);
+        }
+
+        // Save attendance record to database with enhanced security data
         const { error } = await dbService.attendanceRecords.insert({
           student_id: studentInfo.id,
           date: new Date().toISOString().split('T')[0],
@@ -162,16 +238,21 @@ export default function StudentDashboard() {
           status: 'present',
           verification_method: 'biometric',
           location: {
-            lat: 28.6139,
-            lng: 77.2090,
-            accuracy: 10
-          }
+            lat: currentLocationResult.gpsLocation.lat,
+            lng: currentLocationResult.gpsLocation.lng,
+            accuracy: currentLocationResult.gpsLocation.accuracy,
+            onCampus: true,
+            ipLocation: currentLocationResult.ipLocation,
+            securityScore: currentLocationResult.confidence,
+            fraudScore: fraudAnalysis.fraudScore
+          },
+          fraud_attempts: fraudAnalysis.fraudAttempt ? [fraudAnalysis.fraudAttempt] : null
         });
 
         if (error) throw error;
 
         setAttendanceMarked(true);
-        toast.success('Attendance marked successfully!');
+        toast.success(`Attendance marked successfully! Security score: ${Math.round(antiSpoofingResult.confidence * 100)}%`);
         setIsMarkingAttendance(false);
         
         // Refresh attendance data
@@ -181,6 +262,24 @@ export default function StudentDashboard() {
         console.error('Error marking attendance:', error);
         toast.error('Failed to mark attendance');
       }
+    } else if (!verified && antiSpoofingResult) {
+      // Face verification failed - analyze why
+      let message = 'Face verification failed: ';
+      if (antiSpoofingResult.spoofingType) {
+        const spoofingMessages = {
+          'photo': 'Photo spoofing detected',
+          'screen': 'Screen display detected', 
+          'video': 'Video playback detected',
+          'deepfake': 'Synthetic media detected',
+          'multiple_faces': 'Multiple faces detected'
+        };
+        message += spoofingMessages[antiSpoofingResult.spoofingType];
+      } else {
+        message += 'Please ensure you are presenting a live face to the camera';
+      }
+      
+      toast.error(message);
+      setFraudAttemptMessage(message);
     }
   };
 
@@ -224,6 +323,19 @@ export default function StudentDashboard() {
       </header>
 
       <div className="container mx-auto px-4 py-8">
+        {/* Security Warnings */}
+        {(securityBlocked || fraudAttemptMessage) && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              <div className="flex items-center justify-between">
+                <span>{fraudAttemptMessage || 'Device blocked due to security violations'}</span>
+                <Shield className="w-4 h-4" />
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Student Info Card */}
           <Card className="glass-card border-foreground/10 fade-in">
@@ -325,10 +437,10 @@ export default function StudentDashboard() {
                   <Button
                     onClick={() => setIsMarkingAttendance(true)}
                     className="w-full bg-foreground text-background hover:bg-foreground/90"
-                    disabled={isMarkingAttendance}
+                    disabled={isMarkingAttendance || securityBlocked}
                   >
                     <Camera className="w-4 h-4 mr-2" />
-                    Mark Attendance
+                    {securityBlocked ? 'Security Blocked' : 'Mark Attendance'}
                   </Button>
                 )}
                 
@@ -345,7 +457,7 @@ export default function StudentDashboard() {
         </div>
 
         {/* Attendance Marking Modal */}
-        {isMarkingAttendance && (
+        {isMarkingAttendance && !securityBlocked && (
           <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <Card className="w-full max-w-2xl glass-card border-foreground/20">
               <CardHeader>
@@ -373,7 +485,7 @@ export default function StudentDashboard() {
                     </h3>
                     <FaceRecognition
                       mode="capture"
-                      onCapture={(imageData) => handleFaceVerified(true)}
+                      onCapture={(imageData, antiSpoofingResult) => handleFaceVerified(true, antiSpoofingResult)}
                     />
                   </div>
                 )}

@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Mail, Phone, Lock, UserPlus } from 'lucide-react';
+import { User, Mail, Phone, Lock, UserPlus, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { buttonVariants } from '@/components/ui/button-variants';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FaceRecognition } from '@/components/FaceRecognition';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { authService, dbService } from '@/lib/dataService';
+import { AntiSpoofingResult } from '@/lib/faceAntiSpoofing';
 
 export default function StudentSignup() {
   const navigate = useNavigate();
@@ -69,8 +71,34 @@ export default function StudentSignup() {
     }
   };
 
-  const handleFaceCapture = async (imageData: string) => {
+  const handleFaceCapture = async (imageData: string, antiSpoofingResult?: AntiSpoofingResult) => {
     setLoading(true);
+
+    // Check if face is live and secure
+    if (!antiSpoofingResult || !antiSpoofingResult.isLive) {
+      const spoofingMessages = {
+        'photo': 'Photo spoofing detected. Please use a live camera for registration.',
+        'screen': 'Screen display detected. Please use a live camera for registration.',
+        'video': 'Video playback detected. Please present yourself live for registration.',
+        'deepfake': 'Synthetic media detected. Registration requires a live face.',
+        'multiple_faces': 'Multiple faces detected. Only one person allowed for registration.'
+      };
+      
+      const message = antiSpoofingResult?.spoofingType 
+        ? spoofingMessages[antiSpoofingResult.spoofingType as keyof typeof spoofingMessages]
+        : 'Face liveness verification failed. Please try again with a live face.';
+      
+      toast.error(message);
+      setLoading(false);
+      return;
+    }
+
+    // Require high confidence for registration
+    if (antiSpoofingResult.confidence < 0.8) {
+      toast.error(`Face quality too low for registration. Quality: ${Math.round(antiSpoofingResult.confidence * 100)}%. Please ensure good lighting and positioning.`);
+      setLoading(false);
+      return;
+    }
 
     // Fetch the current authenticated user's session
     const response = await authService.getUser();
@@ -89,7 +117,12 @@ export default function StudentSignup() {
       phone: formData.phone,
       class: formData.class,
       section: formData.section,
-      face_data: imageData,
+      face_data: JSON.stringify({
+        imageData,
+        antiSpoofingResult,
+        registrationDate: new Date().toISOString(),
+        securityVersion: '2.0'
+      }),
     });
       
     setLoading(false);
@@ -99,7 +132,7 @@ export default function StudentSignup() {
       return;
     }
 
-    toast.success('Face captured and registration complete! Redirecting to login...');
+    toast.success(`Face captured and registration complete! Security score: ${Math.round(antiSpoofingResult.confidence * 100)}%. Redirecting to login...`);
     setTimeout(() => {
       navigate('/student/login');
     }, 2000);
