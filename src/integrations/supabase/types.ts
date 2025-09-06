@@ -191,9 +191,117 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      courses: {
+        Row: {
+          code: string
+          created_at: string
+          credits: number | null
+          department: string | null
+          description: string | null
+          id: string
+          name: string
+          semester: string | null
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          credits?: number | null
+          department?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          semester?: string | null
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          credits?: number | null
+          department?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          semester?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      course_assignments: {
+        Row: {
+          assigned_at: string
+          course_id: string
+          id: string
+          ta_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          course_id: string
+          id?: string
+          ta_id: string
+        }
+        Update: {
+          assigned_at?: string
+          course_id?: string
+          id?: string
+          ta_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_assignments_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_assignments_ta_id_fkey"
+            columns: ["ta_id"]
+            isOneToOne: false
+            referencedRelation: "teaching_assistants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teaching_assistants: {
+        Row: {
+          created_at: string
+          email: string
+          employee_id: string
+          id: string
+          name: string
+          phone: string | null
+          qualification: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          employee_id: string
+          id?: string
+          name: string
+          phone?: string | null
+          qualification?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          employee_id?: string
+          id?: string
+          name?: string
+          phone?: string | null
+          qualification?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Enums: {
-      user_role: "admin" | "faculty" | "student"
+      user_role: "admin" | "faculty" | "student" | "ta"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -321,7 +429,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      user_role: ["admin", "faculty", "student"],
+      user_role: ["admin", "faculty", "student", "ta"],
     },
   },
 } as const
