@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { FaceRecognition } from '@/components/FaceRecognition';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { supabase } from '@/lib/supabaseClient';
+import { authService, dbService } from '@/lib/dataService';
 
 export default function StudentSignup() {
   const navigate = useNavigate();
@@ -50,13 +50,10 @@ export default function StudentSignup() {
 
       setLoading(true);
 
-      const { data, error } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/student/dashboard`
-        }
-      });
+      const { data, error } = await authService.signUp(
+        formData.email,
+        formData.password
+      );
 
       setLoading(false);
 
@@ -76,7 +73,7 @@ export default function StudentSignup() {
     setLoading(true);
 
     // Fetch the current authenticated user's session
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await authService.getUser();
 
     if (authError || !user) {
       toast.error('Authentication error. Please log in again.');
@@ -84,20 +81,16 @@ export default function StudentSignup() {
       return;
     }
 
-    const { error } = await supabase
-      .from('students')
-      .insert([
-        {
-          user_id: user.id, // Use the real-time user ID from the session
-          name: formData.name,
-          roll_number: formData.rollNumber,
-          email: formData.email,
-          phone: formData.phone,
-          class: formData.class,
-          section: formData.section,
-          face_data: imageData,
-        },
-      ]);
+    const { error } = await dbService.students.insert({
+      user_id: user.id, // Use the real-time user ID from the session
+      name: formData.name,
+      roll_number: formData.rollNumber,
+      email: formData.email,
+      phone: formData.phone,
+      class: formData.class,
+      section: formData.section,
+      face_data: imageData,
+    });
       
     setLoading(false);
 

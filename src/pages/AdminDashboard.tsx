@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Users, Calendar, MapPin, Shield, AlertTriangle, 
   TrendingUp, Download, Settings, Search, Filter,
-  Eye, Edit, Trash2, CheckCircle, XCircle
+  Eye, Edit, Trash2, CheckCircle, XCircle, LogOut, Plus
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { buttonVariants } from '@/components/ui/button-variants';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,26 +13,117 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { authService, dbService, statsService, getServiceStatus } from '@/lib/dataService';
 
 export default function AdminDashboard() {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalStudents: 0,
+    presentToday: 0,
+    fraudAttempts: 0,
+    attendanceRate: 0,
+  });
+  const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
+  const [students, setStudents] = useState<any[]>([]);
+  const [geofences, setGeofences] = useState<any[]>([]);
+  const [serviceStatus, setServiceStatus] = useState({ supabase: false, mockData: true });
 
-  // Demo data
-  const stats = {
-    totalStudents: 850,
-    presentToday: 742,
-    fraudAttempts: 12,
-    attendanceRate: 87.3,
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    setLoading(true);
+    try {
+      // Get service status
+      const status = await getServiceStatus();
+      setServiceStatus(status);
+
+      // Load stats
+      const statsData = await statsService.getStats();
+      setStats(statsData);
+
+      // Load attendance records with student info
+      const { data: attendanceData } = await dbService.attendanceRecords.selectWithStudents();
+      setAttendanceRecords(attendanceData || []);
+
+      // Load students
+      const { data: studentsData } = await dbService.students.select();
+      setStudents(studentsData || []);
+
+      // Load geofences
+      const { data: geofencesData } = await dbService.geofences.select();
+      setGeofences(geofencesData || []);
+
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+      toast.error('Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const recentAttendance = [
-    { id: 1, name: 'John Doe', rollNo: '2024001', time: '09:15 AM', status: 'present', method: 'face' },
-    { id: 2, name: 'Jane Smith', rollNo: '2024002', time: '09:18 AM', status: 'present', method: 'face' },
-    { id: 3, name: 'Mike Johnson', rollNo: '2024003', time: '09:22 AM', status: 'late', method: 'manual' },
-    { id: 4, name: 'Sarah Wilson', rollNo: '2024004', time: '09:30 AM', status: 'present', method: 'face' },
-    { id: 5, name: 'Tom Brown', rollNo: '2024005', time: '-', status: 'absent', method: '-' },
-  ];
+  const handleLogout = async () => {
+    try {
+      await authService.signOut();
+      navigate('/admin/login');
+    } catch (error) {
+      console.error('Error logging out:', error);
+      toast.error('Failed to logout');
+    }
+  };
 
+  const handleExportAttendance = () => {
+    // Create CSV content
+    const csvContent = [
+      ['Student Name', 'Roll Number', 'Date', 'Check-in Time', 'Status', 'Method'],
+      ...attendanceRecords.map(record => [
+        record.student_name || record.students?.name || 'Unknown',
+        record.student_roll || record.students?.roll_number || 'Unknown',
+        new Date(record.date).toLocaleDateString(),
+        new Date(record.check_in_time).toLocaleTimeString(),
+        record.status,
+        record.verification_method
+      ])
+    ].map(row => row.join(',')).join('\n');
+
+    // Create and download file
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `attendance_report_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+    
+    toast.success('Attendance report exported successfully!');
+  };
+
+  const handleAddGeofence = async () => {
+    try {
+      const { data, error } = await dbService.geofences.insert({
+        name: `Campus Area ${geofences.length + 1}`,
+        type: 'radius',
+        center: { lat: 28.6139 + (Math.random() * 0.001), lng: 77.2090 + (Math.random() * 0.001) },
+        radius: 100,
+        active: true,
+      });
+
+      if (error) throw error;
+
+      toast.success('New geofence added successfully!');
+      loadDashboardData(); // Reload data
+    } catch (error) {
+      console.error('Error adding geofence:', error);
+      toast.error('Failed to add geofence');
+    }
+  };
+
+  // Demo data for fraud logs (this would come from database in real implementation)
   const fraudLogs = [
     { id: 1, studentName: 'Alex Turner', type: 'Photo Spoofing', time: '08:45 AM', confidence: 92 },
     { id: 2, studentName: 'Chris Lee', type: 'Screen Detection', time: '09:10 AM', confidence: 88 },
@@ -44,13 +136,19 @@ export default function AdminDashboard() {
       <header className="glass-card border-b">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold gradient-text">Admin Dashboard</h1>
+            <div>
+              <h1 className="text-2xl font-bold gradient-text">Admin Dashboard</h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                Data Source: {serviceStatus.supabase ? '🟢 Supabase' : '🟡 Mock Data'}
+              </p>
+            </div>
             <div className="flex items-center gap-4">
               <Button variant="ghost" size="sm">
                 <Settings className="w-4 h-4 mr-2" />
                 Settings
               </Button>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={handleLogout}>
+                <LogOut className="w-4 h-4 mr-2" />
                 Logout
               </Button>
             </div>
@@ -58,7 +156,15 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-8">
+      {loading ? (
+        <div className="flex items-center justify-center min-h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+            <p className="mt-4 text-muted-foreground">Loading dashboard data...</p>
+          </div>
+        </div>
+      ) : (
+        <div className="container mx-auto px-4 py-8">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card className="glass-card fade-in">
@@ -139,7 +245,7 @@ export default function AdminDashboard() {
                       <Filter className="w-4 h-4 mr-2" />
                       Filter
                     </Button>
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" onClick={handleExportAttendance}>
                       <Download className="w-4 h-4 mr-2" />
                       Export
                     </Button>
@@ -160,11 +266,19 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {recentAttendance.map((record) => (
+                      {attendanceRecords
+                        .filter(record => {
+                          const studentName = record.student_name || record.students?.name || '';
+                          const rollNumber = record.student_roll || record.students?.roll_number || '';
+                          return studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                 rollNumber.toLowerCase().includes(searchQuery.toLowerCase());
+                        })
+                        .slice(0, 10)
+                        .map((record) => (
                         <tr key={record.id} className="border-b hover:bg-muted/50 transition-colors">
-                          <td className="p-4 font-medium">{record.name}</td>
-                          <td className="p-4">{record.rollNo}</td>
-                          <td className="p-4">{record.time}</td>
+                          <td className="p-4 font-medium">{record.student_name || record.students?.name || 'Unknown'}</td>
+                          <td className="p-4">{record.student_roll || record.students?.roll_number || 'Unknown'}</td>
+                          <td className="p-4">{new Date(record.check_in_time).toLocaleTimeString()}</td>
                           <td className="p-4">
                             <span className={cn(
                               "px-2 py-1 rounded-full text-xs font-semibold",
@@ -176,20 +290,27 @@ export default function AdminDashboard() {
                             </span>
                           </td>
                           <td className="p-4">
-                            <span className="text-sm text-muted-foreground capitalize">{record.method}</span>
+                            <span className="text-sm text-muted-foreground capitalize">{record.verification_method}</span>
                           </td>
                           <td className="p-4">
                             <div className="flex gap-2">
-                              <Button variant="ghost" size="sm">
+                              <Button variant="ghost" size="sm" onClick={() => toast.info(`Viewing details for ${record.student_name || 'student'}`)}>
                                 <Eye className="w-4 h-4" />
                               </Button>
-                              <Button variant="ghost" size="sm">
+                              <Button variant="ghost" size="sm" onClick={() => toast.info('Edit functionality coming soon')}>
                                 <Edit className="w-4 h-4" />
                               </Button>
                             </div>
                           </td>
                         </tr>
                       ))}
+                      {attendanceRecords.length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                            No attendance records found
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -239,45 +360,55 @@ export default function AdminDashboard() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Main Campus</label>
-                    <div className="p-4 border rounded-lg space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">Center Point</span>
-                        <span className="text-sm text-muted-foreground">28.6139°N, 77.2090°E</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">Radius</span>
-                        <span className="text-sm text-muted-foreground">200 meters</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">Status</span>
-                        <span className="text-sm text-success">Active</span>
+                  {geofences.map((geofence) => (
+                    <div key={geofence.id} className="space-y-2">
+                      <label className="text-sm font-medium">{geofence.name}</label>
+                      <div className="p-4 border rounded-lg space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">Center Point</span>
+                          <span className="text-sm text-muted-foreground">
+                            {geofence.center?.lat?.toFixed(4)}°N, {geofence.center?.lng?.toFixed(4)}°E
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">Radius</span>
+                          <span className="text-sm text-muted-foreground">{geofence.radius} meters</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">Status</span>
+                          <span className={cn(
+                            "text-sm",
+                            geofence.active ? "text-success" : "text-destructive"
+                          )}>
+                            {geofence.active ? 'Active' : 'Inactive'}
+                          </span>
+                        </div>
+                        <div className="flex gap-2 mt-2">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => toast.info('Edit functionality coming soon')}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => toast.info('Delete functionality coming soon')}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Library Building</label>
-                    <div className="p-4 border rounded-lg space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">Center Point</span>
-                        <span className="text-sm text-muted-foreground">28.6145°N, 77.2095°E</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">Radius</span>
-                        <span className="text-sm text-muted-foreground">50 meters</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">Status</span>
-                        <span className="text-sm text-success">Active</span>
-                      </div>
-                    </div>
-                  </div>
+                  ))}
                 </div>
 
-                <Button className={cn(buttonVariants({ variant: "royal" }))}>
-                  <MapPin className="w-4 h-4 mr-2" />
+                <Button 
+                  className={cn(buttonVariants({ variant: "royal" }))}
+                  onClick={handleAddGeofence}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
                   Add New Geofence
                 </Button>
               </CardContent>
@@ -332,7 +463,8 @@ export default function AdminDashboard() {
             </div>
           </TabsContent>
         </Tabs>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

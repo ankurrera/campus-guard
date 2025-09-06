@@ -9,7 +9,7 @@ import { FaceRecognition } from '@/components/FaceRecognition';
 import { GeofenceStatus } from '@/components/GeofenceStatus';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { supabase } from '@/lib/supabaseClient';
+import { authService, dbService } from '@/lib/dataService';
 import { Database } from '@/integrations/supabase/types';
 
 // Demo geofences - In production, fetch from database
@@ -41,18 +41,14 @@ export default function StudentDashboard() {
 
   const fetchStudentData = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await authService.getUser();
       
       if (!user) {
         navigate('/student/login');
         return;
       }
 
-      const { data: student, error } = await supabase
-        .from('students')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
+      const { data: student, error } = await dbService.students.select(user.id);
 
       if (error) throw error;
       setStudentInfo(student);
@@ -66,22 +62,14 @@ export default function StudentDashboard() {
 
   const fetchAttendanceData = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await authService.getUser();
       if (!user) return;
 
-      const { data: student } = await supabase
-        .from('students')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
+      const { data: student } = await dbService.students.select(user.id);
 
       if (!student) return;
 
-      const { data: records, error } = await supabase
-        .from('attendance_records')
-        .select('*')
-        .eq('student_id', student.id)
-        .order('date', { ascending: false });
+      const { data: records, error } = await dbService.attendanceRecords.select(student.id);
 
       if (error) throw error;
 
@@ -100,27 +88,18 @@ export default function StudentDashboard() {
 
   const checkTodayAttendance = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await authService.getUser();
       if (!user) return;
 
-      const { data: student } = await supabase
-        .from('students')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
+      const { data: student } = await dbService.students.select(user.id);
 
       if (!student) return;
 
       const today = new Date().toISOString().split('T')[0];
       
-      const { data, error } = await supabase
-        .from('attendance_records')
-        .select('*')
-        .eq('student_id', student.id)
-        .eq('date', today)
-        .single();
+      const { data } = await dbService.attendanceRecords.select(student.id, today);
 
-      if (data) {
+      if (data && data.length > 0) {
         setAttendanceMarked(true);
       }
     } catch (error) {
@@ -147,20 +126,18 @@ export default function StudentDashboard() {
     if (verified && locationVerified && studentInfo) {
       try {
         // Save attendance record to database
-        const { error } = await supabase
-          .from('attendance_records')
-          .insert({
-            student_id: studentInfo.id,
-            date: new Date().toISOString().split('T')[0],
-            check_in_time: new Date().toISOString(),
-            status: 'present',
-            verification_method: 'biometric',
-            location: {
-              lat: 28.6139,
-              lng: 77.2090,
-              accuracy: 10
-            }
-          });
+        const { error } = await dbService.attendanceRecords.insert({
+          student_id: studentInfo.id,
+          date: new Date().toISOString().split('T')[0],
+          check_in_time: new Date().toISOString(),
+          status: 'present',
+          verification_method: 'biometric',
+          location: {
+            lat: 28.6139,
+            lng: 77.2090,
+            accuracy: 10
+          }
+        });
 
         if (error) throw error;
 
@@ -180,7 +157,7 @@ export default function StudentDashboard() {
 
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut();
+      await authService.signOut();
       navigate('/student/login');
     } catch (error) {
       console.error('Error logging out:', error);
