@@ -6,7 +6,7 @@ type AttendanceRecord = Database['public']['Tables']['attendance_records']['Row'
 type Geofence = Database['public']['Tables']['geofences']['Row'];
 
 // Mock data storage
-let mockStudents: Student[] = [
+const mockStudents: Student[] = [
   {
     id: '1',
     user_id: 'user1',
@@ -48,7 +48,7 @@ let mockStudents: Student[] = [
   },
 ];
 
-let mockAttendanceRecords: AttendanceRecord[] = [
+const mockAttendanceRecords: AttendanceRecord[] = [
   {
     id: '1',
     student_id: '1',
@@ -75,7 +75,7 @@ let mockAttendanceRecords: AttendanceRecord[] = [
   },
 ];
 
-let mockGeofences: Geofence[] = [
+const mockGeofences: Geofence[] = [
   {
     id: '1',
     name: 'Main Campus',

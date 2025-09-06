@@ -88,7 +88,7 @@ export default function StudentDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [navigate]);
+  }, []);
 
   const fetchAttendanceData = useCallback(async () => {
     try {

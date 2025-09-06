@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { MapPin, CheckCircle, XCircle, AlertCircle, Shield, Globe, Wifi } from 'lucide-react';
 import { getCurrentLocation, checkGeofence } from '@/lib/geofencing';
 import { LocationSecurityAnalyzer, LocationVerificationResult } from '@/lib/locationSecurity';
@@ -25,7 +25,7 @@ export function GeofenceStatus({ geofences, onLocationVerified }: GeofenceStatus
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [securityResult, setSecurityResult] = useState<LocationVerificationResult | null>(null);
 
-  const checkLocation = async () => {
+  const checkLocation = useCallback(async () => {
     setLocationStatus('checking');
     setErrorMessage(null);
 
@@ -98,11 +98,11 @@ export function GeofenceStatus({ geofences, onLocationVerified }: GeofenceStatus
       }
       onLocationVerified(false, { lat: 0, lng: 0, accuracy: 0 });
     }
-  };
+  }, [geofences, onLocationVerified]);
 
   useEffect(() => {
     checkLocation();
-  }, []);
+  }, [checkLocation]);
 
   return (
     <div className="space-y-4">

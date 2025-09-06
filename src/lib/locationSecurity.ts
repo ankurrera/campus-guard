@@ -210,57 +210,58 @@ export class IPGeolocationService {
     }
   }
   
-  private static normalizeIPData(data: any, serviceUrl: string): IPGeolocationData {
+  private static normalizeIPData(data: unknown, serviceUrl: string): IPGeolocationData {
+    const ipData = data as Record<string, unknown>;
     // Different services have different response formats
     if (serviceUrl.includes('ipapi.co')) {
       return {
-        ip: data.ip || '',
-        city: data.city || '',
-        region: data.region || '',
-        country: data.country_name || '',
-        latitude: parseFloat(data.latitude) || 0,
-        longitude: parseFloat(data.longitude) || 0,
+        ip: ipData.ip || '',
+        city: ipData.city || '',
+        region: ipData.region || '',
+        country: ipData.country_name || '',
+        latitude: parseFloat(ipData.latitude) || 0,
+        longitude: parseFloat(ipData.longitude) || 0,
         accuracy: 10000, // City level accuracy
-        isp: data.org || '',
-        isVPN: data.threat_types?.includes('vpn') || false,
-        isProxy: data.threat_types?.includes('proxy') || false,
-        isTor: data.threat_types?.includes('tor') || false,
-        isHosting: data.threat_types?.includes('hosting') || false,
-        timezone: data.timezone || ''
+        isp: ipData.org || '',
+        isVPN: ipData.threat_types?.includes('vpn') || false,
+        isProxy: ipData.threat_types?.includes('proxy') || false,
+        isTor: ipData.threat_types?.includes('tor') || false,
+        isHosting: ipData.threat_types?.includes('hosting') || false,
+        timezone: ipData.timezone || ''
       };
     } else if (serviceUrl.includes('ip-api.com')) {
       return {
-        ip: data.query || '',
-        city: data.city || '',
-        region: data.regionName || '',
-        country: data.country || '',
-        latitude: data.lat || 0,
-        longitude: data.lon || 0,
+        ip: ipData.query || '',
+        city: ipData.city || '',
+        region: ipData.regionName || '',
+        country: ipData.country || '',
+        latitude: ipData.lat || 0,
+        longitude: ipData.lon || 0,
         accuracy: 10000,
-        isp: data.isp || '',
-        isVPN: data.proxy || false,
-        isProxy: data.proxy || false,
+        isp: ipData.isp || '',
+        isVPN: ipData.proxy || false,
+        isProxy: ipData.proxy || false,
         isTor: false, // Not provided by this service
-        isHosting: data.hosting || false,
-        timezone: data.timezone || ''
+        isHosting: ipData.hosting || false,
+        timezone: ipData.timezone || ''
       };
     } else {
       // ipinfo.io format
-      const [lat, lng] = (data.loc || '0,0').split(',').map(parseFloat);
+      const [lat, lng] = (ipData.loc || '0,0').split(',').map(parseFloat);
       return {
-        ip: data.ip || '',
-        city: data.city || '',
-        region: data.region || '',
-        country: data.country || '',
+        ip: ipData.ip || '',
+        city: ipData.city || '',
+        region: ipData.region || '',
+        country: ipData.country || '',
         latitude: lat || 0,
         longitude: lng || 0,
         accuracy: 10000,
-        isp: data.org || '',
+        isp: ipData.org || '',
         isVPN: false, // Free tier doesn't provide this
         isProxy: false,
         isTor: false,
         isHosting: false,
-        timezone: data.timezone || ''
+        timezone: ipData.timezone || ''
       };
     }
   }
@@ -416,7 +417,7 @@ export class LocationSecurityAnalyzer {
     // Network type detection (if available)
     let networkType: string | undefined;
     try {
-      // @ts-ignore - Experimental API
+      // @ts-expect-error - Experimental API
       const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
       if (connection) {
         networkType = connection.effectiveType || connection.type;
