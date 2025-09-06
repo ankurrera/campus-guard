@@ -26,9 +26,9 @@ export default function AdminDashboard() {
     fraudAttempts: 0,
     attendanceRate: 0,
   });
-  const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
-  const [students, setStudents] = useState<any[]>([]);
-  const [geofences, setGeofences] = useState<any[]>([]);
+  const [attendanceRecords, setAttendanceRecords] = useState<unknown[]>([]);
+  const [students, setStudents] = useState<unknown[]>([]);
+  const [geofences, setGeofences] = useState<unknown[]>([]);
   const [serviceStatus, setServiceStatus] = useState({ supabase: false, mockData: true });
 
   useEffect(() => {
