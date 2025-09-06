@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { supabase } from '@/lib/supabaseClient';
+import { authService, dbService } from '@/lib/dataService';
 
 export default function StudentLogin() {
   const navigate = useNavigate();
@@ -25,25 +25,21 @@ export default function StudentLogin() {
     e.preventDefault();
     setLoading(true);
 
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email: formData.email,
-      password: formData.password,
-    });
+    const response = await authService.signInWithPassword(
+      formData.email,
+      formData.password
+    );
     
     setLoading(false);
 
-    if (authError) {
-      toast.error(authError.message);
+    if (response.error) {
+      toast.error(response.error.message);
       return;
     }
 
-    if (authData.user) {
+    if (response.user) {
       // Fetch student data from the `students` table
-      const { data: studentData, error: studentError } = await supabase
-        .from('students')
-        .select('*')
-        .eq('user_id', authData.user.id)
-        .single();
+      const { data: studentData, error: studentError } = await dbService.students.select(response.user.id);
       
       if (studentError) {
         toast.error('Failed to fetch student data.');
