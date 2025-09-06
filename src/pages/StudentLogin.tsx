@@ -25,21 +25,21 @@ export default function StudentLogin() {
     e.preventDefault();
     setLoading(true);
 
-    const { data: authData, error: authError } = await authService.signInWithPassword(
+    const response = await authService.signInWithPassword(
       formData.email,
       formData.password
     );
     
     setLoading(false);
 
-    if (authError) {
-      toast.error(authError.message);
+    if (response.error) {
+      toast.error(response.error.message);
       return;
     }
 
-    if (authData.user) {
+    if (response.user) {
       // Fetch student data from the `students` table
-      const { data: studentData, error: studentError } = await dbService.students.select(authData.user.id);
+      const { data: studentData, error: studentError } = await dbService.students.select(response.user.id);
       
       if (studentError) {
         toast.error('Failed to fetch student data.');
