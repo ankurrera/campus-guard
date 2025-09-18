@@ -36,5 +36,9 @@ export interface TADashboardData {
   studentsCount: number;
 }
 
-// Re-export needed types from attendance.ts
-export type { AttendanceRecord, Student } from './attendance';
+// Import needed types from attendance.ts
+import type { AttendanceRecord as AttendanceRecordType, Student } from './attendance';
+
+// Re-export types
+export type AttendanceRecord = AttendanceRecordType;
+export type { Student } from './attendance';

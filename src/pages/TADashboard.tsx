@@ -40,18 +40,18 @@ const TADashboard = () => {
         .eq('user_id', user.id)
         .single();
 
-      if (taError) throw taError;
+      if (taError || !taData) throw taError || new Error('TA data not found');
       
       setTa({
-        id: taData.id,
-        name: taData.name,
-        email: taData.email,
-        employeeId: taData.employee_id,
-        phone: taData.phone,
-        qualification: taData.qualification,
-        userId: taData.user_id,
-        createdAt: new Date(taData.created_at),
-        updatedAt: new Date(taData.updated_at),
+        id: (taData as any).id,
+        name: (taData as any).name,
+        email: (taData as any).email,
+        employeeId: (taData as any).employee_id,
+        phone: (taData as any).phone,
+        qualification: (taData as any).qualification,
+        userId: (taData as any).user_id,
+        createdAt: new Date((taData as any).created_at),
+        updatedAt: new Date((taData as any).updated_at),
       });
 
       // Fetch assigned courses
@@ -61,20 +61,20 @@ const TADashboard = () => {
           course_id,
           courses (*)
         `)
-        .eq('ta_id', taData.id);
+        .eq('ta_id', (taData as any).id);
 
       if (assignmentError) throw assignmentError;
 
-      const courses = courseAssignments?.map(assignment => ({
-        id: assignment.courses.id,
-        name: assignment.courses.name,
-        code: assignment.courses.code,
-        description: assignment.courses.description,
-        department: assignment.courses.department,
-        semester: assignment.courses.semester,
-        credits: assignment.courses.credits,
-        createdAt: new Date(assignment.courses.created_at),
-        updatedAt: new Date(assignment.courses.updated_at),
+      const courses = courseAssignments?.map((assignment: any) => ({
+        id: assignment.courses?.id,
+        name: assignment.courses?.name,
+        code: assignment.courses?.code,
+        description: assignment.courses?.description,
+        department: assignment.courses?.department,
+        semester: assignment.courses?.semester,
+        credits: assignment.courses?.credits,
+        createdAt: new Date(assignment.courses?.created_at),
+        updatedAt: new Date(assignment.courses?.updated_at),
       })) || [];
 
       setAssignedCourses(courses);
@@ -91,7 +91,7 @@ const TADashboard = () => {
 
       if (attendanceError) throw attendanceError;
 
-      const attendance = attendanceData?.map(record => ({
+      const attendance = attendanceData?.map((record: any) => ({
         id: record.id,
         studentId: record.student_id,
         date: new Date(record.date),
@@ -296,8 +296,8 @@ const TADashboard = () => {
                     <TableRow key={record.id} className="border-gray-600">
                       <TableCell className="text-white">
                         <div>
-                          <div className="font-medium">{record.studentName}</div>
-                          <div className="text-sm text-gray-400">{record.studentRollNumber}</div>
+                          <div className="font-medium">{(record as any).studentName}</div>
+                          <div className="text-sm text-gray-400">{(record as any).studentRollNumber}</div>
                         </div>
                       </TableCell>
                       <TableCell className="text-gray-300">

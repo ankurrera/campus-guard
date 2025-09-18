@@ -367,7 +367,7 @@ export default function AdminDashboard() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {geofences.map((geofence) => (
+                  {geofences.map((geofence: any) => (
                     <div key={geofence.id} className="space-y-2">
                       <label className="text-sm font-medium">{geofence.name}</label>
                       <div className="p-4 border rounded-lg space-y-2">

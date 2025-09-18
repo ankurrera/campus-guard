@@ -64,7 +64,7 @@ export default function StudentSignup() {
         return;
       }
 
-      if (response.user) {
+      if (!('error' in response && response.error)) {
         toast.success('Successfully created an account! Now, please register your face.');
         setStep(3);
       }
@@ -102,15 +102,17 @@ export default function StudentSignup() {
 
     // Fetch the current authenticated user's session
     const response = await authService.getUser();
+    const userId = 'data' in response && response.data?.user ? response.data.user.id : 
+                  'user' in response && response.user ? response.user.id : null;
 
-    if (response.error || !response.user) {
+    if (!userId) {
       toast.error('Authentication error. Please log in again.');
       setLoading(false);
       return;
     }
 
     const { error } = await dbService.students.insert({
-      user_id: response.user.id, // Use the real-time user ID from the session
+      user_id: userId, // Use the real-time user ID from the session
       name: formData.name,
       roll_number: formData.rollNumber,
       email: formData.email,

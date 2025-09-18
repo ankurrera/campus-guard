@@ -59,8 +59,8 @@ const TASignup = () => {
 
       if (authData.user) {
         // Create TA profile
-        const { error: profileError } = await supabase
-          .from('teaching_assistants')
+        const { error: profileError } = await (supabase
+          .from('teaching_assistants') as any)
           .insert({
             user_id: authData.user.id,
             name: formData.name,

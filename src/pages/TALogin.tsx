@@ -33,7 +33,7 @@ const TALogin = () => {
       if (data.user) {
         // Check if user is a TA
         const { data: roleData, error: roleError } = await supabase
-          .rpc('get_user_role', { user_uuid: data.user.id });
+          .rpc('get_user_role', { user_uuid: data.user.id } as any);
 
         if (roleError) throw roleError;
 
