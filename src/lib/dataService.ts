@@ -14,11 +14,11 @@ const testSupabaseConnection = async (): Promise<boolean> => {
   if (supabaseAvailable !== null) return supabaseAvailable;
   
   try {
-    const { data, error } = await Promise.race([
+    const result = await Promise.race([
       supabase.from('students').select('count').limit(1),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
-    ]);
-    supabaseAvailable = !error;
+      new Promise<any>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
+    ]) as any;
+    supabaseAvailable = !result.error;
     return supabaseAvailable;
   } catch (error) {
     console.log('Supabase not available, using mock data service');
@@ -83,7 +83,7 @@ export const dbService = {
       const useSupabase = await testSupabaseConnection();
       
       if (useSupabase) {
-        return await supabase.from('students').insert(data).select().single();
+        return await supabase.from('students').insert(data as any).select().single();
       } else {
         return await mockDB.students.insert(data);
       }
@@ -107,7 +107,7 @@ export const dbService = {
       const useSupabase = await testSupabaseConnection();
       
       if (useSupabase) {
-        return await supabase.from('students').update(data).eq('id', id).select().single();
+        return await supabase.from('students').update(data as any).eq('id', id).select().single();
       } else {
         return await mockDB.students.update(id, data);
       }
@@ -129,7 +129,7 @@ export const dbService = {
       const useSupabase = await testSupabaseConnection();
       
       if (useSupabase) {
-        return await supabase.from('attendance_records').insert(data).select().single();
+        return await supabase.from('attendance_records').insert(data as any).select().single();
       } else {
         return await mockDB.attendanceRecords.insert(data);
       }
@@ -183,7 +183,7 @@ export const dbService = {
       const useSupabase = await testSupabaseConnection();
       
       if (useSupabase) {
-        return await supabase.from('geofences').insert(data).select().single();
+        return await supabase.from('geofences').insert(data as any).select().single();
       } else {
         return await mockDB.geofences.insert(data);
       }
@@ -193,7 +193,7 @@ export const dbService = {
       const useSupabase = await testSupabaseConnection();
       
       if (useSupabase) {
-        return await supabase.from('geofences').update(data).eq('id', id).select().single();
+        return await supabase.from('geofences').update(data as any).eq('id', id).select().single();
       } else {
         return await mockDB.geofences.update(id, data);
       }
@@ -224,16 +224,16 @@ export const statsService = {
         ]);
 
         const totalStudents = studentsResult.data?.length || 0;
-        const allAttendance = attendanceResult.data || [];
+        const allAttendance = (attendanceResult.data || []) as any[];
         const today = new Date().toISOString().split('T')[0];
         
-        const presentToday = allAttendance.filter(r => 
+        const presentToday = allAttendance.filter((r: any) => 
           r.date === today && r.status === 'present'
         ).length;
         
         const fraudAttempts = 12; // This would be calculated from fraud_attempts field
         const attendanceRate = allAttendance.length > 0 ? 
-          (allAttendance.filter(r => r.status === 'present').length / allAttendance.length) * 100 : 0;
+          (allAttendance.filter((r: any) => r.status === 'present').length / allAttendance.length) * 100 : 0;
 
         return {
           totalStudents,

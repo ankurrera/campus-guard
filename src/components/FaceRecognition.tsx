@@ -521,10 +521,9 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
                         depthAnalysis: 0.8,
                         textureAnalysis: 0.8,
                         motionAnalysis: 0.8,
-                        consistencyCheck: 0.8,
-                        eyeBlinkDetection: 0.8,
-                        headMovementAnalysis: 0.8,
-                        illuminationAnalysis: 0.8
+                        faceCount: 1,
+                        eyeMovement: 0.8,
+                        blinkDetection: 0.8
                       }
                     };
                     onCapture('data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAAQABAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAABAAEDAREAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=', fallbackResult);

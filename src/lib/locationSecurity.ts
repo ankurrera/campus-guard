@@ -137,7 +137,7 @@ export class DeviceFingerprinting {
       }
       
       // Check for VPN detection evasion
-      if (typeof window.chrome !== 'undefined' && typeof window.chrome.runtime !== 'undefined') {
+      if (typeof (window as any).chrome !== 'undefined' && typeof (window as any).chrome.runtime !== 'undefined') {
         detectedExtensions.push('chrome-extension-detected');
       }
       
@@ -215,53 +215,53 @@ export class IPGeolocationService {
     // Different services have different response formats
     if (serviceUrl.includes('ipapi.co')) {
       return {
-        ip: ipData.ip || '',
-        city: ipData.city || '',
-        region: ipData.region || '',
-        country: ipData.country_name || '',
-        latitude: parseFloat(ipData.latitude) || 0,
-        longitude: parseFloat(ipData.longitude) || 0,
+        ip: String(ipData.ip || ''),
+        city: String(ipData.city || ''),
+        region: String(ipData.region || ''),
+        country: String(ipData.country_name || ''),
+        latitude: parseFloat(String(ipData.latitude)) || 0,
+        longitude: parseFloat(String(ipData.longitude)) || 0,
         accuracy: 10000, // City level accuracy
-        isp: ipData.org || '',
-        isVPN: ipData.threat_types?.includes('vpn') || false,
-        isProxy: ipData.threat_types?.includes('proxy') || false,
-        isTor: ipData.threat_types?.includes('tor') || false,
-        isHosting: ipData.threat_types?.includes('hosting') || false,
-        timezone: ipData.timezone || ''
+        isp: String(ipData.org || ''),
+        isVPN: (ipData.threat_types as any)?.includes?.('vpn') || false,
+        isProxy: (ipData.threat_types as any)?.includes?.('proxy') || false,
+        isTor: (ipData.threat_types as any)?.includes?.('tor') || false,
+        isHosting: (ipData.threat_types as any)?.includes?.('hosting') || false,
+        timezone: String(ipData.timezone || '')
       };
     } else if (serviceUrl.includes('ip-api.com')) {
       return {
-        ip: ipData.query || '',
-        city: ipData.city || '',
-        region: ipData.regionName || '',
-        country: ipData.country || '',
-        latitude: ipData.lat || 0,
-        longitude: ipData.lon || 0,
+        ip: String(ipData.query || ''),
+        city: String(ipData.city || ''),
+        region: String(ipData.regionName || ''),
+        country: String(ipData.country || ''),
+        latitude: Number(ipData.lat) || 0,
+        longitude: Number(ipData.lon) || 0,
         accuracy: 10000,
-        isp: ipData.isp || '',
-        isVPN: ipData.proxy || false,
-        isProxy: ipData.proxy || false,
+        isp: String(ipData.isp || ''),
+        isVPN: Boolean(ipData.proxy) || false,
+        isProxy: Boolean(ipData.proxy) || false,
         isTor: false, // Not provided by this service
-        isHosting: ipData.hosting || false,
-        timezone: ipData.timezone || ''
+        isHosting: Boolean(ipData.hosting) || false,
+        timezone: String(ipData.timezone || '')
       };
     } else {
       // ipinfo.io format
-      const [lat, lng] = (ipData.loc || '0,0').split(',').map(parseFloat);
+      const [lat, lng] = String(ipData.loc || '0,0').split(',').map(parseFloat);
       return {
-        ip: ipData.ip || '',
-        city: ipData.city || '',
-        region: ipData.region || '',
-        country: ipData.country || '',
+        ip: String(ipData.ip || ''),
+        city: String(ipData.city || ''),
+        region: String(ipData.region || ''),
+        country: String(ipData.country || ''),
         latitude: lat || 0,
         longitude: lng || 0,
         accuracy: 10000,
-        isp: ipData.org || '',
+        isp: String(ipData.org || ''),
         isVPN: false, // Free tier doesn't provide this
         isProxy: false,
         isTor: false,
         isHosting: false,
-        timezone: ipData.timezone || ''
+        timezone: String(ipData.timezone || '')
       };
     }
   }
