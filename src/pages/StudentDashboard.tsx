@@ -69,9 +69,15 @@ export default function StudentDashboard() {
       try {
         const response = await authService.getUser();
         
-        if (response.user) {
+        if ('data' in response && response.data?.user) {
+          const { data: student, error } = await dbService.students.select(response.data.user.id);
+          if (!error && student && !Array.isArray(student)) {
+            setStudentInfo(student);
+            return;
+          }
+        } else if ('user' in response && response.user) {
           const { data: student, error } = await dbService.students.select(response.user.id);
-          if (!error && student) {
+          if (!error && student && !Array.isArray(student)) {
             setStudentInfo(student);
             return;
           }
@@ -111,9 +117,10 @@ export default function StudentDashboard() {
       // Try to get real data first
       try {
         const response = await authService.getUser();
-        if (response.user) {
-          const { data: student } = await dbService.students.select(response.user.id);
-          if (student) {
+        if (('data' in response && response.data?.user) || ('user' in response && response.user)) {
+          const userId = 'data' in response ? response.data.user?.id : response.user?.id;
+          const { data: student } = await dbService.students.select(userId);
+          if (student && !Array.isArray(student)) {
             const { data: records, error } = await dbService.attendanceRecords.select(student.id);
             if (!error && records) {
               setAttendanceRecords(records);
@@ -246,7 +253,7 @@ export default function StudentDashboard() {
             securityScore: currentLocationResult.confidence,
             fraudScore: fraudAnalysis.fraudScore
           },
-          fraud_attempts: fraudAnalysis.fraudAttempt ? [fraudAnalysis.fraudAttempt] : null
+          fraud_attempts: (fraudAnalysis.fraudAttempt ? [fraudAnalysis.fraudAttempt] : null) as any
         });
 
         if (error) throw error;

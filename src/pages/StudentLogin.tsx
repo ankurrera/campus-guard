@@ -37,9 +37,12 @@ export default function StudentLogin() {
       return;
     }
 
-    if (response.user) {
+    const userId = 'data' in response && response.data?.user ? response.data.user.id : 
+                    'user' in response && response.user ? response.user.id : null;
+    
+    if (userId) {
       // Fetch student data from the `students` table
-      const { data: studentData, error: studentError } = await dbService.students.select(response.user.id);
+      const { data: studentData, error: studentError } = await dbService.students.select(userId);
       
       if (studentError) {
         toast.error('Failed to fetch student data.');

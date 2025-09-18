@@ -52,7 +52,7 @@ export default function AdminDashboard() {
 
       // Load students
       const { data: studentsData } = await dbService.students.select();
-      setStudents(studentsData || []);
+      setStudents(Array.isArray(studentsData) ? studentsData : studentsData ? [studentsData] : []);
 
       // Load geofences
       const { data: geofencesData } = await dbService.geofences.select();
@@ -80,7 +80,7 @@ export default function AdminDashboard() {
     // Create CSV content
     const csvContent = [
       ['Student Name', 'Roll Number', 'Date', 'Check-in Time', 'Status', 'Method'],
-      ...attendanceRecords.map(record => [
+      ...attendanceRecords.map((record: any) => [
         record.student_name || record.students?.name || 'Unknown',
         record.student_roll || record.students?.roll_number || 'Unknown',
         new Date(record.date).toLocaleDateString(),
@@ -269,14 +269,14 @@ export default function AdminDashboard() {
                     </thead>
                     <tbody>
                       {attendanceRecords
-                        .filter(record => {
+                        .filter((record: any) => {
                           const studentName = record.student_name || record.students?.name || '';
                           const rollNumber = record.student_roll || record.students?.roll_number || '';
                           return studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                                  rollNumber.toLowerCase().includes(searchQuery.toLowerCase());
                         })
                         .slice(0, 10)
-                        .map((record) => (
+                        .map((record: any) => (
                         <tr key={record.id} className="border-b hover:bg-muted/50 transition-colors">
                           <td className="p-4 font-medium">{record.student_name || record.students?.name || 'Unknown'}</td>
                           <td className="p-4">{record.student_roll || record.students?.roll_number || 'Unknown'}</td>
