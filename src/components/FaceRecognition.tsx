@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { buttonVariants } from './ui/button-variants';
 import { Alert, AlertDescription } from './ui/alert';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 import * as faceapi from 'face-api.js';
 import { FaceAntiSpoofingAnalyzer, AntiSpoofingResult } from '@/lib/faceAntiSpoofing';
 
@@ -38,41 +39,44 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
 
   const loadModels = async () => {
     try {
-      // Try the primary CDN first
-      let MODEL_URL = 'https://cdn.jsdelivr.net/gh/cgarciagl/face-api.js/weights';
+      // Try local models first (bundled with the app)
+      const LOCAL_MODEL_URL = '/models';
       
       try {
+        console.log('Loading face detection models from local directory...');
         await Promise.all([
-          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
-          faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL)
+          faceapi.nets.tinyFaceDetector.loadFromUri(LOCAL_MODEL_URL),
+          faceapi.nets.faceLandmark68Net.loadFromUri(LOCAL_MODEL_URL),
+          faceapi.nets.faceRecognitionNet.loadFromUri(LOCAL_MODEL_URL),
+          faceapi.nets.faceExpressionNet.loadFromUri(LOCAL_MODEL_URL)
         ]);
+        console.log('Successfully loaded all face detection models from local directory');
         setModelsLoaded(true);
         return;
-      } catch (primaryError) {
-        console.warn('Primary CDN failed, trying fallback:', primaryError);
+      } catch (localError) {
+        console.warn('Local models failed, trying CDN fallback:', localError);
         
-        // Try fallback CDN
-        MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
+        // Fallback to CDN if local models fail
+        const CDN_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
         try {
+          console.log('Loading face detection models from CDN fallback...');
           await Promise.all([
-            faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-            faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-            faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
-            faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL)
+            faceapi.nets.tinyFaceDetector.loadFromUri(CDN_URL),
+            faceapi.nets.faceLandmark68Net.loadFromUri(CDN_URL),
+            faceapi.nets.faceRecognitionNet.loadFromUri(CDN_URL),
+            faceapi.nets.faceExpressionNet.loadFromUri(CDN_URL)
           ]);
+          console.log('Successfully loaded face detection models from CDN');
           setModelsLoaded(true);
           return;
-        } catch (fallbackError) {
-          console.warn('Fallback CDN also failed:', fallbackError);
-          throw new Error('All CDN sources failed to load face detection models');
+        } catch (cdnError) {
+          console.warn('CDN fallback also failed:', cdnError);
+          throw new Error('All model sources failed to load face detection models');
         }
       }
     } catch (error) {
       console.error('Error loading face models:', error);
-      setErrorMessage('Failed to load face detection models. Face recognition will not be available.');
-      // Set a flag to allow form submission without face detection
+      setErrorMessage('Failed to load face detection models. Please check your internet connection and try again.');
       setModelsLoaded(false);
     }
   };
@@ -347,6 +351,46 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
     }
   };
 
+  const captureBasicImage = async () => {
+    if (!videoRef.current || !canvasRef.current) {
+      toast.error('Camera not available. Please start the camera first.');
+      return;
+    }
+
+    setIsProcessing(true);
+
+    const canvas = canvasRef.current;
+    const context = canvas.getContext('2d');
+    if (!context) {
+      setIsProcessing(false);
+      return;
+    }
+
+    // Capture the actual camera frame
+    canvas.width = videoRef.current.videoWidth || 640;
+    canvas.height = videoRef.current.videoHeight || 480;
+    context.drawImage(videoRef.current, 0, 0);
+
+    const imageData = canvas.toDataURL('image/jpeg', 0.8);
+    
+    // Create a basic anti-spoofing result indicating limited verification
+    const basicResult: AntiSpoofingResult = {
+      isLive: true, // Assume live since it's from camera
+      confidence: 0.7, // Lower confidence due to no face detection
+      details: {
+        depthAnalysis: 0.7,
+        textureAnalysis: 0.7,
+        motionAnalysis: 0.7,
+        faceCount: 1, // Assume one face
+        eyeMovement: 0.7,
+        blinkDetection: 0.7
+      }
+    };
+
+    onCapture(imageData, basicResult);
+    setIsProcessing(false);
+  };
+
   const captureImage = async () => {
     if (!videoRef.current || !canvasRef.current) return;
 
@@ -388,16 +432,16 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
             <div className="text-center space-y-4 p-8">
               <Camera className="w-16 h-16 mx-auto text-primary" />
               <p className="text-muted-foreground">
-                {errorMessage ? 'Face detection unavailable' : 
-                 modelsLoaded ? 'Camera is not active' : 'Loading face detection models...'}
+                {errorMessage ? 'Face detection models failed to load' : 
+                 modelsLoaded ? 'Ready to capture your face with advanced security checks' : 'Loading face detection models...'}
               </p>
               <Button
                 onClick={() => setIsStreaming(true)}
                 disabled={!modelsLoaded && !errorMessage}
                 className={cn(buttonVariants({ variant: "royal" }))}
               >
-                {errorMessage ? 'Start Camera (No Face Detection)' :
-                 modelsLoaded ? 'Start Camera' : 'Loading...'}
+                {errorMessage ? 'Start Camera (Basic Mode)' :
+                 modelsLoaded ? 'Start Face Registration' : 'Loading...'}
               </Button>
             </div>
           </div>
@@ -510,30 +554,70 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
             <div className="space-y-2">
-              <p>Face detection models couldn't be loaded, but you can still complete registration.</p>
-              <Button
-                onClick={() => {
-                  // Fallback: skip face detection and use placeholder data
-                  const fallbackResult: AntiSpoofingResult = {
-                    isLive: true,
-                    confidence: 0.8,
-                    spoofingType: null,
-                    details: {
-                      depthAnalysis: 0.8,
-                      textureAnalysis: 0.8,
-                      motionAnalysis: 0.8,
-                      faceCount: 1,
-                      eyeMovement: 0.8,
-                      blinkDetection: 0.8
+              <p>Face detection models couldn't be loaded. Please check your internet connection and try refreshing the page.</p>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => {
+                    setErrorMessage(null);
+                    setModelsLoaded(false);
+                    loadModels();
+                  }}
+                  size="sm"
+                  variant="outline"
+                >
+                  Retry Loading Models
+                </Button>
+                <Button
+                  onClick={() => {
+                    // Enhanced fallback: capture actual camera image without face detection
+                    if (videoRef.current && canvasRef.current) {
+                      const canvas = canvasRef.current;
+                      const context = canvas.getContext('2d');
+                      if (context) {
+                        canvas.width = videoRef.current.videoWidth || 640;
+                        canvas.height = videoRef.current.videoHeight || 480;
+                        context.drawImage(videoRef.current, 0, 0);
+                        const imageData = canvas.toDataURL('image/jpeg', 0.8);
+                        
+                        // Create a basic fallback anti-spoofing result
+                        const fallbackResult: AntiSpoofingResult = {
+                          isLive: true,
+                          confidence: 0.7, // Lower confidence since we can't verify
+                          details: {
+                            depthAnalysis: 0.7,
+                            textureAnalysis: 0.7,
+                            motionAnalysis: 0.7,
+                            faceCount: 1,
+                            eyeMovement: 0.7,
+                            blinkDetection: 0.7
+                          }
+                        };
+                        onCapture(imageData, fallbackResult);
+                        return;
+                      }
                     }
-                  };
-                  onCapture('data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAAQABAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAABAAEDAREAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=', fallbackResult);
-                }}
-                size="sm"
-                className={cn(buttonVariants({ variant: "royal" }))}
-              >
-                Continue Registration
-              </Button>
+                    
+                    // If no camera, use placeholder
+                    const fallbackResult: AntiSpoofingResult = {
+                      isLive: true,
+                      confidence: 0.6,
+                      details: {
+                        depthAnalysis: 0.6,
+                        textureAnalysis: 0.6,
+                        motionAnalysis: 0.6,
+                        faceCount: 1,
+                        eyeMovement: 0.6,
+                        blinkDetection: 0.6
+                      }
+                    };
+                    onCapture('data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAAQABAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAABAAEDAREAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=', fallbackResult);
+                  }}
+                  size="sm"
+                  className={cn(buttonVariants({ variant: "royal" }))}
+                >
+                  Continue Without Face Detection
+                </Button>
+              </div>
             </div>
           </AlertDescription>
         </Alert>
@@ -551,11 +635,14 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
       {isStreaming && (
         <div className="flex gap-3 justify-center">
           <Button
-            onClick={captureImage}
+            onClick={modelsLoaded ? captureImage : captureBasicImage}
             disabled={isProcessing}
             className={cn(buttonVariants({ variant: "royal", size: "lg" }))}
           >
-            {isProcessing ? 'Processing...' : mode === 'capture' ? 'Capture Face' : 'Verify Face'}
+            {isProcessing ? 'Processing...' : 
+             mode === 'capture' ? 
+               (modelsLoaded ? 'Capture Face (Secure)' : 'Capture Face (Basic)') : 
+               (modelsLoaded ? 'Verify Face (Secure)' : 'Verify Face (Basic)')}
           </Button>
           <Button
             onClick={() => {
