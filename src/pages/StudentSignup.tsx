@@ -102,8 +102,13 @@ export default function StudentSignup() {
 
     // Fetch the current authenticated user's session
     const response = await authService.getUser();
-    const userId = 'data' in response && response.data?.user ? response.data.user.id : 
-                  'user' in response && response.user ? response.user.id : null;
+    
+    let userId = null;
+    if ('data' in response && response.data?.user) {
+      userId = response.data.user.id;
+    } else if ('user' in response && response.user) {
+      userId = response.user.id;
+    }
 
     if (!userId) {
       toast.error('Authentication error. Please log in again.');
