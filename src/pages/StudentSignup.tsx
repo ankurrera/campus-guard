@@ -94,8 +94,8 @@ export default function StudentSignup() {
     }
 
     // Require high confidence for registration
-    if (antiSpoofingResult.confidence < 0.8) {
-      toast.error(`Face quality too low for registration. Quality: ${Math.round(antiSpoofingResult.confidence * 100)}%. Please ensure good lighting and positioning.`);
+    if (antiSpoofingResult.confidence < 0.6) {
+      toast.error(`Face quality too low for registration. Quality: ${Math.round(antiSpoofingResult.confidence * 100)}%. Please ensure good lighting and clear face visibility.`);
       setLoading(false);
       return;
     }
