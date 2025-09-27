@@ -460,26 +460,34 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
               width={640}
               height={480}
             />
-            {livenessStatus && (
+            {livenessStatus && modelsLoaded && (
               <div className="absolute top-4 right-4">
                 {livenessStatus === 'checking' && (
                   <div className="bg-warning/90 text-warning-foreground px-3 py-1 rounded-full text-sm flex items-center gap-2">
                     <div className="w-2 h-2 bg-warning-foreground rounded-full animate-pulse" />
-                    Checking liveness...
+                    Analyzing face...
                   </div>
                 )}
                 {livenessStatus === 'passed' && (
                   <div className="bg-success/90 text-success-foreground px-3 py-1 rounded-full text-sm flex items-center gap-2">
                     <CheckCircle className="w-4 h-4" />
-                    Live face detected
+                    Live face verified
                   </div>
                 )}
                 {livenessStatus === 'failed' && (
                   <div className="bg-destructive/90 text-destructive-foreground px-3 py-1 rounded-full text-sm flex items-center gap-2">
                     <XCircle className="w-4 h-4" />
-                    Spoofing detected
+                    Security check failed
                   </div>
                 )}
+              </div>
+            )}
+            {!modelsLoaded && isStreaming && (
+              <div className="absolute top-4 right-4">
+                <div className="bg-info/90 text-info-foreground px-3 py-1 rounded-full text-sm flex items-center gap-2">
+                  <Camera className="w-4 h-4" />
+                  Basic capture mode
+                </div>
               </div>
             )}
           </div>
