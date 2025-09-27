@@ -388,14 +388,16 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
             <div className="text-center space-y-4 p-8">
               <Camera className="w-16 h-16 mx-auto text-primary" />
               <p className="text-muted-foreground">
-                {modelsLoaded ? 'Camera is not active' : 'Loading face detection models...'}
+                {errorMessage ? 'Face detection unavailable' : 
+                 modelsLoaded ? 'Camera is not active' : 'Loading face detection models...'}
               </p>
               <Button
                 onClick={() => setIsStreaming(true)}
-                disabled={!modelsLoaded}
+                disabled={!modelsLoaded && !errorMessage}
                 className={cn(buttonVariants({ variant: "royal" }))}
               >
-                {modelsLoaded ? 'Start Camera' : 'Loading...'}
+                {errorMessage ? 'Start Camera (No Face Detection)' :
+                 modelsLoaded ? 'Start Camera' : 'Loading...'}
               </Button>
             </div>
           </div>
@@ -503,39 +505,45 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
         </div>
       )}
 
-      {errorMessage && (
+      {errorMessage && errorMessage.includes('Failed to load face detection models') && (
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            <div className="space-y-2">
+              <p>Face detection models couldn't be loaded, but you can still complete registration.</p>
+              <Button
+                onClick={() => {
+                  // Fallback: skip face detection and use placeholder data
+                  const fallbackResult: AntiSpoofingResult = {
+                    isLive: true,
+                    confidence: 0.8,
+                    spoofingType: null,
+                    details: {
+                      depthAnalysis: 0.8,
+                      textureAnalysis: 0.8,
+                      motionAnalysis: 0.8,
+                      faceCount: 1,
+                      eyeMovement: 0.8,
+                      blinkDetection: 0.8
+                    }
+                  };
+                  onCapture('data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAAQABAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAABAAEDAREAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=', fallbackResult);
+                }}
+                size="sm"
+                className={cn(buttonVariants({ variant: "royal" }))}
+              >
+                Continue Registration
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {errorMessage && !errorMessage.includes('Failed to load face detection models') && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
             {errorMessage}
-            {errorMessage.includes('Failed to load face detection models') && (
-              <div className="mt-3">
-                <Button
-                  onClick={() => {
-                    // Fallback: skip face detection and use placeholder data
-                    const fallbackResult: AntiSpoofingResult = {
-                      isLive: true,
-                      confidence: 0.8,
-                      spoofingType: null,
-                      details: {
-                        depthAnalysis: 0.8,
-                        textureAnalysis: 0.8,
-                        motionAnalysis: 0.8,
-                        faceCount: 1,
-                        eyeMovement: 0.8,
-                        blinkDetection: 0.8
-                      }
-                    };
-                    onCapture('data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAAQABAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAABAAEDAREAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=', fallbackResult);
-                  }}
-                  size="sm"
-                  variant="outline"
-                  className="mt-2"
-                >
-                  Continue without face detection
-                </Button>
-              </div>
-            )}
           </AlertDescription>
         </Alert>
       )}
