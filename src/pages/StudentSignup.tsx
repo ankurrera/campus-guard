@@ -54,23 +54,28 @@ export default function StudentSignup() {
       setLoading(true);
 
       try {
-        const response = await authService.signUp(
+        // First, sign up the user
+        const signupResponse = await authService.signUp(
           formData.email,
           formData.password
         );
 
-        if (response.error) {
-          toast.error(response.error.message);
+        if (signupResponse.error) {
+          toast.error(signupResponse.error.message);
           setLoading(false);
           return;
         }
 
-        // Get user ID from response
+        // Get user ID from signup response
         let newUserId: string | null = null;
-        if ('data' in response && response.data?.user) {
-          newUserId = response.data.user.id;
-        } else if ('user' in response && response.user) {
-          newUserId = response.user.id;
+        let hasSession = false;
+        
+        if ('data' in signupResponse && signupResponse.data?.user) {
+          newUserId = signupResponse.data.user.id;
+          hasSession = !!signupResponse.data?.session;
+        } else if ('user' in signupResponse && signupResponse.user) {
+          newUserId = signupResponse.user.id;
+          hasSession = !!(signupResponse as any).session;
         }
 
         if (!newUserId) {
@@ -79,19 +84,19 @@ export default function StudentSignup() {
           return;
         }
 
+        // If email confirmation is required (no session), show message and redirect
+        if (!hasSession) {
+          toast.success('Account created! Please check your email to confirm your account, then come back to complete registration.');
+          setLoading(false);
+          setTimeout(() => {
+            navigate('/student/login');
+          }, 3000);
+          return;
+        }
+
         // Store the user ID for face registration
         setUserId(newUserId);
-        
-        // Check if email confirmation is required
-        const isConfirmationRequired = 'data' in response && response.data?.user && 
-          !response.data?.session && response.data?.user.identities?.length === 0;
-        
-        if (isConfirmationRequired) {
-          toast.success('Account created! Please check your email to confirm, then proceed with face registration.');
-        } else {
-          toast.success('Account created successfully! Now, please register your face.');
-        }
-        
+        toast.success('Account created successfully! Now, please register your face.');
         setLoading(false);
         setStep(3);
       } catch (error: any) {
@@ -130,19 +135,30 @@ export default function StudentSignup() {
       return;
     }
 
-    // Verify we have the user ID from signup
-    if (!userId) {
-      toast.error('Registration error. Please start the signup process again.');
-      setLoading(false);
-      navigate('/student/signup');
-      return;
-    }
-
     try {
+      // Verify we have an active session
+      const { data: { session }, error: sessionError } = await authService.getSession();
+      
+      if (sessionError || !session?.user) {
+        toast.error('Your session has expired. Please sign in to complete registration.');
+        setLoading(false);
+        navigate('/student/login');
+        return;
+      }
 
-      // Save student profile with face data
+      const activeUserId = session.user.id;
+
+      // Verify the session user ID matches the stored user ID from signup
+      if (userId && userId !== activeUserId) {
+        toast.error('Session mismatch. Please start registration again.');
+        setLoading(false);
+        navigate('/student/signup');
+        return;
+      }
+
+      // Save student profile with face data - use the session user ID to ensure RLS passes
       const { error } = await dbService.students.insert({
-        user_id: userId,
+        user_id: activeUserId,
         name: formData.name,
         roll_number: formData.rollNumber,
         email: formData.email,
