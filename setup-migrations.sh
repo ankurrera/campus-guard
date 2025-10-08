@@ -126,6 +126,11 @@ if supabase db push; then
     echo "  2. TAs can login at /ta/login"
     echo "  3. Admins can assign TAs to courses"
     echo ""
+    echo "To verify the setup and test the application:"
+    echo "  • Read TESTING_GUIDE.md for comprehensive testing steps"
+    echo "  • Run: npm run dev"
+    echo "  • Navigate to: http://localhost:8080/ta/signup"
+    echo ""
 else
     echo ""
     echo -e "${RED}Error: Failed to apply migrations${NC}"

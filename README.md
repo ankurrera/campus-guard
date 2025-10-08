@@ -9,9 +9,11 @@ A comprehensive attendance management system with support for administrators, fa
 ERROR: 42P01: relation "teaching_assistants" does not exist
 ```
 
-### Quick Setup
+### 🚀 Quick Fix
 
-Run the automated setup script:
+**See [QUICKSTART.md](QUICKSTART.md) for the fastest way to fix this error (2-3 minutes).**
+
+Or run the automated setup script:
 
 ```bash
 chmod +x setup-migrations.sh
@@ -24,9 +26,12 @@ This script will:
 3. Apply all necessary migrations
 4. Create the required tables (courses, teaching_assistants, course_assignments)
 
-### Manual Setup
+### 📚 Documentation
 
-If you prefer to set up manually, see [supabase/README.md](supabase/README.md) for detailed instructions.
+- **[QUICKSTART.md](QUICKSTART.md)** - Fastest way to fix the error (START HERE!)
+- **[MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)** - Detailed migration instructions
+- **[TESTING_GUIDE.md](TESTING_GUIDE.md)** - How to verify everything works
+- **[supabase/README.md](supabase/README.md)** - Database schema details
 
 ## Project info
 
