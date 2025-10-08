@@ -52,6 +52,8 @@ The `user_role` enum has been updated to include:
 1. Copy the contents of `001_add_ta_tables.sql`
 2. Go to your Supabase dashboard → SQL Editor
 3. Paste and execute the SQL commands
+4. Copy the contents of `002_add_ta_insert_policy.sql`
+5. Paste and execute the SQL commands in the SQL Editor
 
 ## Sample Data
 
@@ -65,6 +67,7 @@ The migration includes sample courses:
 
 Row Level Security (RLS) is enabled with these policies:
 - Anyone can view courses
+- Authenticated users can insert their own TA profile during signup
 - TAs can view/update their own profile
 - TAs can view their course assignments
 - Admin access needs to be configured based on your existing admin setup
