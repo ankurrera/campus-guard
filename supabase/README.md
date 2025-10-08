@@ -2,6 +2,15 @@
 
 This document explains how to set up the Teaching Assistant (TA) functionality in your Supabase database.
 
+## 🚨 Troubleshooting
+
+If you encounter the error:
+```
+ERROR: 42P01: relation "teaching_assistants" does not exist
+```
+
+This means the database migrations have not been applied yet. Follow the setup instructions below to resolve this issue.
+
 ## Tables Added
 
 ### 1. courses
@@ -43,12 +52,48 @@ The `user_role` enum has been updated to include:
 
 ## How to Apply These Changes
 
-### Option 1: Using Supabase CLI (Recommended)
-1. Install Supabase CLI if you haven't already
-2. Link your project: `supabase link --project-ref YOUR_PROJECT_ID`
-3. Apply the migration: `supabase db push`
+### ⚡ Quick Method: Automated Script (Recommended)
 
-### Option 2: Manual SQL Execution
+From the root of the repository, run:
+
+```bash
+chmod +x setup-migrations.sh
+./setup-migrations.sh
+```
+
+This script will guide you through the entire setup process automatically.
+
+### Option 1: Using Supabase CLI (Manual)
+
+1. Install Supabase CLI if you haven't already:
+   ```bash
+   # macOS/Linux
+   brew install supabase/tap/supabase
+   
+   # Linux (manual install)
+   curl -fsSL https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz | tar -xz
+   sudo mv supabase /usr/local/bin/
+   
+   # Windows
+   scoop install supabase
+   ```
+
+2. Login to Supabase:
+   ```bash
+   supabase login
+   ```
+
+3. Link your project:
+   ```bash
+   supabase link --project-ref qauglrdqssnesfdacxfk
+   ```
+
+4. Apply the migrations:
+   ```bash
+   supabase db push
+   ```
+
+### Option 2: Manual SQL Execution via Supabase Dashboard
 1. Copy the contents of `001_add_ta_tables.sql`
 2. Go to your Supabase dashboard → SQL Editor
 3. Paste and execute the SQL commands

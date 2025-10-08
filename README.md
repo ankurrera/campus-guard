@@ -1,4 +1,37 @@
-# Welcome to your Lovable project
+# Campus Guard
+
+A comprehensive attendance management system with support for administrators, faculty, students, and teaching assistants.
+
+## 🚨 Important: Database Setup Required
+
+**Before running the application, you must apply database migrations to avoid the error:**
+```
+ERROR: 42P01: relation "teaching_assistants" does not exist
+```
+
+### 🚀 Quick Fix
+
+**See [QUICKSTART.md](QUICKSTART.md) for the fastest way to fix this error (2-3 minutes).**
+
+Or run the automated setup script:
+
+```bash
+chmod +x setup-migrations.sh
+./setup-migrations.sh
+```
+
+This script will:
+1. Check if Supabase CLI is installed
+2. Link to your Supabase project
+3. Apply all necessary migrations
+4. Create the required tables (courses, teaching_assistants, course_assignments)
+
+### 📚 Documentation
+
+- **[QUICKSTART.md](QUICKSTART.md)** - Fastest way to fix the error (START HERE!)
+- **[MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)** - Detailed migration instructions
+- **[TESTING_GUIDE.md](TESTING_GUIDE.md)** - How to verify everything works
+- **[supabase/README.md](supabase/README.md)** - Database schema details
 
 ## Project info
 
