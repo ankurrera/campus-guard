@@ -100,21 +100,17 @@ export default function StudentSignup() {
       return;
     }
 
-    // Fetch the current authenticated user's session
-    const response = await authService.getUser();
+    // Get the current session
+    const { data: { session }, error: sessionError } = await authService.getSession();
     
-    let userId = null;
-    if ('data' in response && response.data?.user) {
-      userId = response.data.user.id;
-    } else if ('user' in response && response.user) {
-      userId = response.user.id;
-    }
-
-    if (!userId) {
-      toast.error('Authentication error. Please log in again.');
+    if (sessionError || !session?.user) {
+      toast.error('Session expired. Please start registration again.');
       setLoading(false);
+      navigate('/student/login');
       return;
     }
+
+    const userId = session.user.id;
 
     const { error } = await dbService.students.insert({
       user_id: userId, // Use the real-time user ID from the session

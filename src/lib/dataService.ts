@@ -74,6 +74,17 @@ export const authService = {
       return await mockAuth.getUser();
     }
   },
+
+  getSession: async () => {
+    const useSupabase = await testSupabaseConnection();
+    
+    if (useSupabase) {
+      return await supabase.auth.getSession();
+    } else {
+      // Mock implementation
+      return { data: { session: null }, error: null };
+    }
+  },
 };
 
 // Database service
@@ -107,7 +118,8 @@ export const dbService = {
       const useSupabase = await testSupabaseConnection();
       
       if (useSupabase) {
-        return await supabase.from('students').update(data as any).eq('id', id).select().single();
+        // @ts-ignore - Supabase update accepts partial data
+        return await supabase.from('students').update(data).eq('id', id).select().single();
       } else {
         return await mockDB.students.update(id, data);
       }
@@ -193,7 +205,8 @@ export const dbService = {
       const useSupabase = await testSupabaseConnection();
       
       if (useSupabase) {
-        return await supabase.from('geofences').update(data as any).eq('id', id).select().single();
+        // @ts-ignore - Supabase update accepts partial data
+        return await supabase.from('geofences').update(data).eq('id', id).select().single();
       } else {
         return await mockDB.geofences.update(id, data);
       }
