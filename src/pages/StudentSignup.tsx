@@ -17,6 +17,7 @@ export default function StudentSignup() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     rollNumber: '',
@@ -52,21 +53,50 @@ export default function StudentSignup() {
 
       setLoading(true);
 
-      const response = await authService.signUp(
-        formData.email,
-        formData.password
-      );
+      try {
+        const response = await authService.signUp(
+          formData.email,
+          formData.password
+        );
 
-      setLoading(false);
+        if (response.error) {
+          toast.error(response.error.message);
+          setLoading(false);
+          return;
+        }
 
-      if (response.error) {
-        toast.error(response.error.message);
-        return;
-      }
+        // Get user ID from response
+        let newUserId: string | null = null;
+        if ('data' in response && response.data?.user) {
+          newUserId = response.data.user.id;
+        } else if ('user' in response && response.user) {
+          newUserId = response.user.id;
+        }
 
-      if (!('error' in response && response.error)) {
-        toast.success('Successfully created an account! Now, please register your face.');
+        if (!newUserId) {
+          toast.error('Failed to create account. Please try again.');
+          setLoading(false);
+          return;
+        }
+
+        // Store the user ID for face registration
+        setUserId(newUserId);
+        
+        // Check if email confirmation is required
+        const isConfirmationRequired = 'data' in response && response.data?.user && 
+          !response.data?.session && response.data?.user.identities?.length === 0;
+        
+        if (isConfirmationRequired) {
+          toast.success('Account created! Please check your email to confirm, then proceed with face registration.');
+        } else {
+          toast.success('Account created successfully! Now, please register your face.');
+        }
+        
+        setLoading(false);
         setStep(3);
+      } catch (error: any) {
+        toast.error(error.message || 'Failed to create account');
+        setLoading(false);
       }
     }
   };
@@ -100,45 +130,59 @@ export default function StudentSignup() {
       return;
     }
 
-    // Get the current session
-    const { data: { session }, error: sessionError } = await authService.getSession();
-    
-    if (sessionError || !session?.user) {
-      toast.error('Session expired. Please start registration again.');
+    // Verify we have the user ID from signup
+    if (!userId) {
+      toast.error('Registration error. Please start the signup process again.');
       setLoading(false);
-      navigate('/student/login');
+      navigate('/student/signup');
       return;
     }
 
-    const userId = session.user.id;
+    try {
 
-    const { error } = await dbService.students.insert({
-      user_id: userId, // Use the real-time user ID from the session
-      name: formData.name,
-      roll_number: formData.rollNumber,
-      email: formData.email,
-      phone: formData.phone,
-      class: formData.class,
-      section: formData.section,
-      face_data: JSON.stringify({
-        imageData,
-        antiSpoofingResult,
-        registrationDate: new Date().toISOString(),
-        securityVersion: '2.0'
-      }),
-    });
+      // Save student profile with face data
+      const { error } = await dbService.students.insert({
+        user_id: userId,
+        name: formData.name,
+        roll_number: formData.rollNumber,
+        email: formData.email,
+        phone: formData.phone || '',
+        class: formData.class,
+        section: formData.section,
+        face_data: JSON.stringify({
+          imageData,
+          antiSpoofingResult: {
+            isLive: antiSpoofingResult.isLive,
+            confidence: antiSpoofingResult.confidence,
+            spoofingType: antiSpoofingResult.spoofingType || null,
+            details: antiSpoofingResult.details
+          },
+          registrationDate: new Date().toISOString(),
+          securityVersion: '2.0'
+        }),
+      });
+        
+      setLoading(false);
+
+      if (error) {
+        console.error('Face registration error:', error);
+        toast.error(`Registration failed: ${error.message}`);
+        return;
+      }
+
+      toast.success(`Face registered successfully! Security score: ${Math.round(antiSpoofingResult.confidence * 100)}%. Redirecting to login...`);
       
-    setLoading(false);
-
-    if (error) {
-      toast.error(error.message);
-      return;
+      // Sign out to ensure fresh login
+      await authService.signOut();
+      
+      setTimeout(() => {
+        navigate('/student/login');
+      }, 2000);
+    } catch (error: any) {
+      setLoading(false);
+      console.error('Face registration error:', error);
+      toast.error(error.message || 'Failed to register face data');
     }
-
-    toast.success(`Face captured and registration complete! Security score: ${Math.round(antiSpoofingResult.confidence * 100)}%. Redirecting to login...`);
-    setTimeout(() => {
-      navigate('/student/login');
-    }, 2000);
   };
 
   return (
