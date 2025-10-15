@@ -103,6 +103,105 @@ export type Database = {
           },
         ]
       }
+      course_enrollments: {
+        Row: {
+          course_id: string
+          enrolled_at: string | null
+          id: string
+          status: string | null
+          student_id: string
+        }
+        Insert: {
+          course_id: string
+          enrolled_at?: string | null
+          id?: string
+          status?: string | null
+          student_id: string
+        }
+        Update: {
+          course_id?: string
+          enrolled_at?: string | null
+          id?: string
+          status?: string | null
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_enrollments_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_enrollments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      course_tas: {
+        Row: {
+          assigned_at: string | null
+          course_id: string
+          id: string
+          ta_id: string
+        }
+        Insert: {
+          assigned_at?: string | null
+          course_id: string
+          id?: string
+          ta_id: string
+        }
+        Update: {
+          assigned_at?: string | null
+          course_id?: string
+          id?: string
+          ta_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_tas_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_tas_ta_id_fkey"
+            columns: ["ta_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      courses: {
+        Row: {
+          code: string
+          created_at: string | null
+          description: string | null
+          id: string
+          title: string
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          title: string
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          title?: string
+        }
+        Relationships: []
+      }
       geofences: {
         Row: {
           active: boolean
@@ -133,6 +232,82 @@ export type Database = {
           name?: string
           radius?: number | null
           type?: string
+        }
+        Relationships: []
+      }
+      messages: {
+        Row: {
+          body: string
+          course_id: string | null
+          id: string
+          read_at: string | null
+          recipient_id: string | null
+          sender_id: string
+          sent_at: string | null
+        }
+        Insert: {
+          body: string
+          course_id?: string | null
+          id?: string
+          read_at?: string | null
+          recipient_id?: string | null
+          sender_id: string
+          sent_at?: string | null
+        }
+        Update: {
+          body?: string
+          course_id?: string | null
+          id?: string
+          read_at?: string | null
+          recipient_id?: string | null
+          sender_id?: string
+          sent_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string | null
+          display_name: string | null
+          id: string
+          role: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          display_name?: string | null
+          id: string
+          role?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          display_name?: string | null
+          id?: string
+          role?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -178,11 +353,233 @@ export type Database = {
         }
         Relationships: []
       }
+      ta_availability: {
+        Row: {
+          created_at: string | null
+          day_of_week: number
+          end_time: string
+          id: string
+          is_virtual: boolean | null
+          location: string | null
+          start_time: string
+          ta_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          day_of_week: number
+          end_time: string
+          id?: string
+          is_virtual?: boolean | null
+          location?: string | null
+          start_time: string
+          ta_id: string
+        }
+        Update: {
+          created_at?: string | null
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          is_virtual?: boolean | null
+          location?: string | null
+          start_time?: string
+          ta_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ta_availability_ta_id_fkey"
+            columns: ["ta_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ta_session_attendance: {
+        Row: {
+          attended_at: string | null
+          id: string
+          session_id: string
+          student_id: string
+        }
+        Insert: {
+          attended_at?: string | null
+          id?: string
+          session_id: string
+          student_id: string
+        }
+        Update: {
+          attended_at?: string | null
+          id?: string
+          session_id?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ta_session_attendance_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "ta_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ta_session_attendance_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ta_sessions: {
+        Row: {
+          course_id: string | null
+          created_at: string | null
+          end_time: string
+          id: string
+          location: string | null
+          session_type: string | null
+          start_time: string
+          ta_id: string
+        }
+        Insert: {
+          course_id?: string | null
+          created_at?: string | null
+          end_time: string
+          id?: string
+          location?: string | null
+          session_type?: string | null
+          start_time: string
+          ta_id: string
+        }
+        Update: {
+          course_id?: string | null
+          created_at?: string | null
+          end_time?: string
+          id?: string
+          location?: string | null
+          session_type?: string | null
+          start_time?: string
+          ta_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ta_sessions_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ta_sessions_ta_id_fkey"
+            columns: ["ta_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ta_task_comments: {
+        Row: {
+          author_id: string
+          body: string
+          created_at: string | null
+          id: string
+          task_id: string
+        }
+        Insert: {
+          author_id: string
+          body: string
+          created_at?: string | null
+          id?: string
+          task_id: string
+        }
+        Update: {
+          author_id?: string
+          body?: string
+          created_at?: string | null
+          id?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ta_task_comments_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ta_task_comments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "ta_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ta_tasks: {
+        Row: {
+          course_id: string | null
+          created_at: string | null
+          description: string | null
+          due_at: string | null
+          id: string
+          priority: string | null
+          status: string | null
+          ta_id: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          course_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          priority?: string | null
+          status?: string | null
+          ta_id: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          course_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          priority?: string | null
+          status?: string | null
+          ta_id?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ta_tasks_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ta_tasks_ta_id_fkey"
+            columns: ["ta_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      current_role: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_user_role: {
         Args: { user_uuid: string }
         Returns: Database["public"]["Enums"]["user_role"]
@@ -191,117 +588,21 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
-      courses: {
-        Row: {
-          code: string
-          created_at: string
-          credits: number | null
-          department: string | null
-          description: string | null
-          id: string
-          name: string
-          semester: string | null
-          updated_at: string
-        }
-        Insert: {
-          code: string
-          created_at?: string
-          credits?: number | null
-          department?: string | null
-          description?: string | null
-          id?: string
-          name: string
-          semester?: string | null
-          updated_at?: string
-        }
-        Update: {
-          code?: string
-          created_at?: string
-          credits?: number | null
-          department?: string | null
-          description?: string | null
-          id?: string
-          name?: string
-          semester?: string | null
-          updated_at?: string
-        }
-        Relationships: []
+      is_instructor: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
       }
-      course_assignments: {
-        Row: {
-          assigned_at: string
-          course_id: string
-          id: string
-          ta_id: string
-        }
-        Insert: {
-          assigned_at?: string
-          course_id: string
-          id?: string
-          ta_id: string
-        }
-        Update: {
-          assigned_at?: string
-          course_id?: string
-          id?: string
-          ta_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "course_assignments_course_id_fkey"
-            columns: ["course_id"]
-            isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "course_assignments_ta_id_fkey"
-            columns: ["ta_id"]
-            isOneToOne: false
-            referencedRelation: "teaching_assistants"
-            referencedColumns: ["id"]
-          },
-        ]
+      is_student: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
       }
-      teaching_assistants: {
-        Row: {
-          created_at: string
-          email: string
-          employee_id: string
-          id: string
-          name: string
-          phone: string | null
-          qualification: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          email: string
-          employee_id: string
-          id?: string
-          name: string
-          phone?: string | null
-          qualification?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          email?: string
-          employee_id?: string
-          id?: string
-          name?: string
-          phone?: string | null
-          qualification?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
+      is_ta: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
       }
     }
     Enums: {
-      user_role: "admin" | "faculty" | "student" | "ta"
+      user_role: "admin" | "faculty" | "student"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -429,7 +730,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      user_role: ["admin", "faculty", "student", "ta"],
+      user_role: ["admin", "faculty", "student"],
     },
   },
 } as const
