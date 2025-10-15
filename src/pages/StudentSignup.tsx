@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Mail, Phone, Lock, UserPlus, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,12 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { authService, dbService } from '@/lib/dataService';
 import { AntiSpoofingResult } from '@/lib/faceAntiSpoofing';
+import { supabase } from '@/integrations/supabase/client';
+import { Database } from '@/integrations/supabase/types';
+
+type Department = Database['public']['Tables']['departments']['Row'];
+type Year = Database['public']['Tables']['years']['Row'];
+type Section = Database['public']['Tables']['sections']['Row'];
 
 export default function StudentSignup() {
   const navigate = useNavigate();
@@ -23,12 +29,107 @@ export default function StudentSignup() {
     rollNumber: '',
     email: '',
     phone: '',
-    class: '',
+    department: '',
+    year: '',
     section: '',
     password: '',
     confirmPassword: '',
     faceData: '',
   });
+
+  // State for dynamic dropdown data
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [years, setYears] = useState<Year[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
+  const [loadingDropdowns, setLoadingDropdowns] = useState(false);
+
+  // Fetch departments on component mount
+  useEffect(() => {
+    fetchDepartments();
+  }, []);
+
+  // Fetch years when department changes
+  useEffect(() => {
+    if (formData.department) {
+      fetchYears(formData.department);
+      // Reset year and section when department changes
+      setYears([]);
+      setSections([]);
+    } else {
+      setYears([]);
+      setSections([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.department]);
+
+  // Fetch sections when year changes
+  useEffect(() => {
+    if (formData.year && formData.department) {
+      fetchSections(formData.department, formData.year);
+      // Reset sections when year changes
+      setSections([]);
+    } else {
+      setSections([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.year]);
+
+  const fetchDepartments = async () => {
+    setLoadingDropdowns(true);
+    try {
+      const { data, error } = await supabase
+        .from('departments')
+        .select('*')
+        .order('name');
+      
+      if (error) throw error;
+      setDepartments(data || []);
+    } catch (error) {
+      console.error('Error fetching departments:', error);
+      toast.error('Failed to load departments');
+    } finally {
+      setLoadingDropdowns(false);
+    }
+  };
+
+  const fetchYears = async (departmentId: string) => {
+    setLoadingDropdowns(true);
+    try {
+      const { data, error } = await supabase
+        .from('years')
+        .select('*')
+        .eq('department_id', departmentId)
+        .order('year_number');
+      
+      if (error) throw error;
+      setYears(data || []);
+    } catch (error) {
+      console.error('Error fetching years:', error);
+      toast.error('Failed to load years');
+    } finally {
+      setLoadingDropdowns(false);
+    }
+  };
+
+  const fetchSections = async (departmentId: string, yearId: string) => {
+    setLoadingDropdowns(true);
+    try {
+      const { data, error } = await supabase
+        .from('sections')
+        .select('*')
+        .eq('department_id', departmentId)
+        .eq('year_id', yearId)
+        .order('section_name');
+      
+      if (error) throw error;
+      setSections(data || []);
+    } catch (error) {
+      console.error('Error fetching sections:', error);
+      toast.error('Failed to load sections');
+    } finally {
+      setLoadingDropdowns(false);
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -42,7 +143,7 @@ export default function StudentSignup() {
       }
       setStep(2);
     } else if (step === 2) {
-      if (!formData.class || !formData.section || !formData.password) {
+      if (!formData.department || !formData.year || !formData.section || !formData.password) {
         toast.error('Please fill all required fields');
         return;
       }
@@ -156,6 +257,16 @@ export default function StudentSignup() {
         return;
       }
 
+      // Get department and year data to construct class string
+      const selectedDept = departments.find(d => d.id === formData.department);
+      const selectedYear = years.find(y => y.id === formData.year);
+      const selectedSection = sections.find(s => s.id === formData.section);
+      
+      // Construct class string in format "DEPT_CODE Year_Number" (e.g., "CSE 2nd Year")
+      const classString = selectedDept && selectedYear 
+        ? `${selectedDept.code} ${selectedYear.year_name}`
+        : '';
+
       // Save student profile with face data - use the session user ID to ensure RLS passes
       const { error } = await dbService.students.insert({
         user_id: activeUserId,
@@ -163,8 +274,8 @@ export default function StudentSignup() {
         roll_number: formData.rollNumber,
         email: formData.email,
         phone: formData.phone || '',
-        class: formData.class,
-        section: formData.section,
+        class: classString,
+        section: selectedSection?.section_name || formData.section,
         face_data: JSON.stringify({
           imageData,
           antiSpoofingResult: {
@@ -319,21 +430,41 @@ export default function StudentSignup() {
               <h2 className="text-xl font-semibold mb-4">Academic Information</h2>
               
               <div className="space-y-2">
-                <Label htmlFor="class">Class *</Label>
+                <Label htmlFor="department">Department *</Label>
                 <Select
-                  value={formData.class}
-                  onValueChange={(value) => setFormData({ ...formData, class: value })}
+                  value={formData.department}
+                  onValueChange={(value) => setFormData({ ...formData, department: value, year: '', section: '' })}
+                  disabled={loadingDropdowns}
                 >
-                  <SelectTrigger id="class">
-                    <SelectValue placeholder="Select your class" />
+                  <SelectTrigger id="department">
+                    <SelectValue placeholder="Select your department" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="cse-1">CSE 1st Year</SelectItem>
-                    <SelectItem value="cse-2">CSE 2nd Year</SelectItem>
-                    <SelectItem value="cse-3">CSE 3rd Year</SelectItem>
-                    <SelectItem value="cse-4">CSE 4th Year</SelectItem>
-                    <SelectItem value="ece-1">ECE 1st Year</SelectItem>
-                    <SelectItem value="ece-2">ECE 2nd Year</SelectItem>
+                    {departments.map((dept) => (
+                      <SelectItem key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="year">Year *</Label>
+                <Select
+                  value={formData.year}
+                  onValueChange={(value) => setFormData({ ...formData, year: value, section: '' })}
+                  disabled={!formData.department || loadingDropdowns}
+                >
+                  <SelectTrigger id="year">
+                    <SelectValue placeholder="Select your year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {years.map((year) => (
+                      <SelectItem key={year.id} value={year.id}>
+                        {year.year_name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -343,15 +474,17 @@ export default function StudentSignup() {
                 <Select
                   value={formData.section}
                   onValueChange={(value) => setFormData({ ...formData, section: value })}
+                  disabled={!formData.year || loadingDropdowns}
                 >
                   <SelectTrigger id="section">
                     <SelectValue placeholder="Select your section" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="A">Section A</SelectItem>
-                    <SelectItem value="B">Section B</SelectItem>
-                    <SelectItem value="C">Section C</SelectItem>
-                    <SelectItem value="D">Section D</SelectItem>
+                    {sections.map((section) => (
+                      <SelectItem key={section.id} value={section.id}>
+                        Section {section.section_name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
