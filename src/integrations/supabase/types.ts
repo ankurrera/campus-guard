@@ -675,6 +675,7 @@ export type Database = {
       teaching_assistants: {
         Row: {
           created_at: string
+          department: string | null
           email: string
           employee_id: string | null
           face_data: string | null
@@ -687,6 +688,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          department?: string | null
           email: string
           employee_id?: string | null
           face_data?: string | null
@@ -699,6 +701,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          department?: string | null
           email?: string
           employee_id?: string | null
           face_data?: string | null
