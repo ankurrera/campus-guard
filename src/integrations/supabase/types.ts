@@ -202,6 +202,107 @@ export type Database = {
         }
         Relationships: []
       }
+      departments: {
+        Row: {
+          id: string
+          name: string
+          code: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          code: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          code?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      years: {
+        Row: {
+          id: string
+          department_id: string
+          year_number: number
+          year_name: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          department_id: string
+          year_number: number
+          year_name: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          department_id?: string
+          year_number?: number
+          year_name?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "years_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      sections: {
+        Row: {
+          id: string
+          department_id: string
+          year_id: string
+          section_name: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          department_id: string
+          year_id: string
+          section_name: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          department_id?: string
+          year_id?: string
+          section_name?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sections_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sections_year_id_fkey"
+            columns: ["year_id"]
+            isOneToOne: false
+            referencedRelation: "years"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       geofences: {
         Row: {
           active: boolean
