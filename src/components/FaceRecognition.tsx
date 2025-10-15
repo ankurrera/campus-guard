@@ -20,7 +20,7 @@ import { BiometricConsentModal, BiometricConsentData } from './BiometricConsentM
 import { Switch } from './ui/switch';
 
 interface FaceRecognitionProps {
-  onCapture: (imageData: string, antiSpoofingResult?: AntiSpoofingResult, capture3D?: { method: string; frames?: any[]; frameCount?: number; duration?: number; consentData?: BiometricConsentData | null }) => void;
+  onCapture: (imageData: string, antiSpoofingResult?: AntiSpoofingResult, capture3D?: { method: string; frames?: unknown[]; frameCount?: number; duration?: number; consentData?: BiometricConsentData | null }) => void;
   onVerify?: (verified: boolean, antiSpoofingResult?: AntiSpoofingResult) => void;
   mode: 'capture' | 'verify';
   studentId?: string; // Required for 3D capture uploads
