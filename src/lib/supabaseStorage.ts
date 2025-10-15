@@ -36,6 +36,7 @@ export async function initializeBiometricBucket(): Promise<void> {
           'model/obj',
           'application/octet-stream',
           'image/png',
+          'image/jpeg',
           'text/plain', // for PLY files
         ],
       });
@@ -44,6 +45,44 @@ export async function initializeBiometricBucket(): Promise<void> {
   } catch (error) {
     console.error('Error initializing biometric bucket:', error);
     throw error;
+  }
+}
+
+/**
+ * Ensure bucket exists before operations
+ * Internal helper that silently ensures bucket is available
+ */
+async function ensureBucketExists(): Promise<void> {
+  try {
+    // Check if bucket exists
+    const { data: buckets } = await supabase.storage.listBuckets();
+    const bucketExists = buckets?.some(b => b.name === BIOMETRIC_BUCKET);
+
+    if (!bucketExists) {
+      // Create bucket with appropriate policies
+      const { error } = await supabase.storage.createBucket(BIOMETRIC_BUCKET, {
+        public: false, // Private bucket for security
+        fileSizeLimit: 50 * 1024 * 1024, // 50MB limit
+        allowedMimeTypes: [
+          'model/gltf-binary',
+          'model/obj',
+          'application/octet-stream',
+          'image/png',
+          'image/jpeg',
+          'text/plain', // for PLY files
+        ],
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      console.log('Biometric storage bucket created automatically');
+    }
+  } catch (error) {
+    // If bucket creation fails, log the error but don't throw
+    // This allows the upload to continue and fail with a more specific error
+    console.error('Error ensuring bucket exists:', error);
   }
 }
 
@@ -57,6 +96,9 @@ export async function upload3DFaceData(
   const result: UploadResult = { success: false };
 
   try {
+    // Ensure bucket exists before uploading
+    await ensureBucketExists();
+
     const timestamp = Date.now();
     const basePath = `students/${studentId}`;
 
