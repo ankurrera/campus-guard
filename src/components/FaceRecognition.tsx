@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Camera, AlertCircle, CheckCircle, XCircle, Shield, Eye, Move, Layers } from 'lucide-react';
+import { Camera, AlertCircle, CheckCircle, XCircle, Shield, Eye, Move, Layers, Box } from 'lucide-react';
 import { Button } from './ui/button';
 import { buttonVariants } from './ui/button-variants';
 import { Alert, AlertDescription } from './ui/alert';
@@ -7,11 +7,23 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import * as faceapi from 'face-api.js';
 import { FaceAntiSpoofingAnalyzer, AntiSpoofingResult } from '@/lib/faceAntiSpoofing';
+import { 
+  detectDeviceCapabilities, 
+  DeviceCapabilities, 
+  CaptureMethod 
+} from '@/lib/face3d';
+import { 
+  PhotogrammetryCapture as PhotogrammetryController,
+  CaptureInstructions 
+} from '@/lib/depthAdapters/photogrammetry';
+import { BiometricConsentModal, BiometricConsentData } from './BiometricConsentModal';
+import { Switch } from './ui/switch';
 
 interface FaceRecognitionProps {
-  onCapture: (imageData: string, antiSpoofingResult?: AntiSpoofingResult) => void;
+  onCapture: (imageData: string, antiSpoofingResult?: AntiSpoofingResult, capture3D?: any) => void;
   onVerify?: (verified: boolean, antiSpoofingResult?: AntiSpoofingResult) => void;
   mode: 'capture' | 'verify';
+  studentId?: string; // Required for 3D capture uploads
 }
 
 // Correct type definition for the detection result to include landmarks and expressions
@@ -20,7 +32,7 @@ type FaceDetectionResult = faceapi.WithFaceExpressions<
   faceapi.WithFaceLandmarks<faceapi.WithFaceDetection<{}>>
 >;
 
-export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionProps) {
+export function FaceRecognition({ onCapture, onVerify, mode, studentId }: FaceRecognitionProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const meshCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -32,6 +44,23 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
   const [antiSpoofingResult, setAntiSpoofingResult] = useState<AntiSpoofingResult | null>(null);
   const detectionsRef = useRef<FaceDetectionResult[] | null>(null);
   const antiSpoofingAnalyzer = useRef(new FaceAntiSpoofingAnalyzer());
+
+  // 3D Capture state
+  const [enable3DCapture, setEnable3DCapture] = useState(false);
+  const [deviceCapabilities, setDeviceCapabilities] = useState<DeviceCapabilities | null>(null);
+  const [showConsentModal, setShowConsentModal] = useState(false);
+  const [hasConsent, setHasConsent] = useState(false);
+  const [is3DCapturing, setIs3DCapturing] = useState(false);
+  const [captureInstructions, setCaptureInstructions] = useState<CaptureInstructions | null>(null);
+  const photogrammetryController = useRef<PhotogrammetryController>(new PhotogrammetryController());
+
+  // Check device capabilities on mount
+  useEffect(() => {
+    detectDeviceCapabilities().then(caps => {
+      setDeviceCapabilities(caps);
+      console.log('Device capabilities:', caps);
+    });
+  }, []);
 
   useEffect(() => {
     loadModels();
@@ -391,8 +420,80 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
     setIsProcessing(false);
   };
 
+  // Handle 3D capture toggle
+  const handle3DCaptureToggle = (checked: boolean) => {
+    if (checked && !hasConsent) {
+      setShowConsentModal(true);
+    } else {
+      setEnable3DCapture(checked);
+    }
+  };
+
+  // Handle consent
+  const handleConsent = (data: BiometricConsentData) => {
+    setHasConsent(true);
+    setEnable3DCapture(true);
+    setShowConsentModal(false);
+    toast.success('Biometric consent granted. 3D capture enabled.');
+  };
+
+  const handleConsentDecline = () => {
+    setShowConsentModal(false);
+    setEnable3DCapture(false);
+    toast.info('3D capture disabled. You can still use 2D face recognition.');
+  };
+
+  // Start 3D multi-view capture
+  const start3DCapture = async () => {
+    if (!videoRef.current || !hasConsent) return;
+
+    setIs3DCapturing(true);
+    setIsProcessing(true);
+
+    try {
+      const captureResult = await photogrammetryController.current.start(
+        videoRef.current,
+        (instructions) => {
+          setCaptureInstructions(instructions);
+        }
+      );
+
+      // Capture complete
+      setCaptureInstructions(null);
+      setIs3DCapturing(false);
+
+      // Perform liveness check on first frame
+      const spoofingResult = await performLivenessCheck();
+
+      // Get the first frame as the main image
+      const firstFrame = captureResult.frames[0]?.imageData || '';
+
+      // Pass capture data to parent
+      onCapture(firstFrame, spoofingResult || undefined, {
+        method: 'photogrammetry' as CaptureMethod,
+        frames: captureResult.frames,
+        frameCount: captureResult.totalFrames,
+        duration: captureResult.duration,
+      });
+
+      toast.success('3D face capture completed successfully!');
+      setIsProcessing(false);
+    } catch (error) {
+      console.error('3D capture failed:', error);
+      setIs3DCapturing(false);
+      setIsProcessing(false);
+      toast.error('3D capture failed. Please try again.');
+    }
+  };
+
   const captureImage = async () => {
     if (!videoRef.current || !canvasRef.current) return;
+
+    // If 3D capture is enabled, use multi-view capture
+    if (enable3DCapture && hasConsent) {
+      await start3DCapture();
+      return;
+    }
 
     setIsProcessing(true);
 
@@ -426,6 +527,91 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
 
   return (
     <div className="space-y-4">
+      {/* Biometric Consent Modal */}
+      <BiometricConsentModal
+        open={showConsentModal}
+        onConsent={handleConsent}
+        onDecline={handleConsentDecline}
+      />
+
+      {/* 3D Capture Toggle */}
+      {deviceCapabilities && deviceCapabilities.supportedMethods.length > 0 && mode === 'capture' && (
+        <div className="glass-card p-4 rounded-xl">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Box className="h-5 w-5 text-primary" />
+              <div>
+                <p className="font-medium">Enable 3D Face Capture</p>
+                <p className="text-sm text-muted-foreground">
+                  {deviceCapabilities.hasDepthSensor || deviceCapabilities.hasWebXR || deviceCapabilities.hasLiDAR
+                    ? 'Your device supports advanced depth sensing'
+                    : 'Multi-view photogrammetry capture available'}
+                </p>
+              </div>
+            </div>
+            <Switch
+              checked={enable3DCapture}
+              onCheckedChange={handle3DCaptureToggle}
+              disabled={isStreaming || isProcessing}
+            />
+          </div>
+          {enable3DCapture && (
+            <Alert className="mt-3">
+              <Shield className="h-4 w-4" />
+              <AlertDescription className="text-sm">
+                3D capture will guide you through a {deviceCapabilities.hasDepthSensor ? 'depth scan' : 'multi-view capture'} process for enhanced security.
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+      )}
+
+      {/* Capture Instructions Overlay */}
+      {is3DCapturing && captureInstructions && (
+        <div className="glass-card p-6 rounded-xl bg-primary/10 border-2 border-primary">
+          <div className="text-center space-y-4">
+            <div className="flex items-center justify-center gap-3">
+              <Box className="h-6 w-6 text-primary animate-pulse" />
+              <h3 className="text-lg font-semibold">
+                {captureInstructions.phase === 'countdown' && 'Get Ready'}
+                {captureInstructions.phase === 'capturing' && '3D Capture in Progress'}
+                {captureInstructions.phase === 'completed' && 'Capture Complete'}
+              </h3>
+            </div>
+            
+            {captureInstructions.phase === 'countdown' && (
+              <div className="text-5xl font-bold text-primary animate-pulse">
+                {captureInstructions.countdown}
+              </div>
+            )}
+            
+            {captureInstructions.phase === 'capturing' && (
+              <div className="space-y-3">
+                <p className="text-muted-foreground">{captureInstructions.message}</p>
+                <div className="w-full bg-secondary rounded-full h-2">
+                  <div 
+                    className="bg-primary h-2 rounded-full transition-all duration-300"
+                    style={{ 
+                      width: `${(captureInstructions.currentFrame / captureInstructions.totalFrames) * 100}%` 
+                    }}
+                  />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Frame {captureInstructions.currentFrame} of {captureInstructions.totalFrames}
+                </p>
+              </div>
+            )}
+
+            {captureInstructions.phase === 'completed' && (
+              <div className="flex items-center justify-center gap-2 text-green-500">
+                <CheckCircle className="h-6 w-6" />
+                <p>{captureInstructions.message}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="relative rounded-xl overflow-hidden glass-card">
         {!isStreaming ? (
           <div className="aspect-video bg-gradient-dark flex items-center justify-center">
@@ -433,7 +619,7 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
               <Camera className="w-16 h-16 mx-auto text-primary" />
               <p className="text-muted-foreground">
                 {errorMessage ? 'Face detection models failed to load' : 
-                 modelsLoaded ? 'Ready to capture your face with advanced security checks' : 'Loading face detection models...'}
+                 modelsLoaded ? (enable3DCapture ? 'Ready for 3D face capture with enhanced security' : 'Ready to capture your face with advanced security checks') : 'Loading face detection models...'}
               </p>
               <Button
                 onClick={() => setIsStreaming(true)}
@@ -441,7 +627,7 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
                 className={cn(buttonVariants({ variant: "royal" }))}
               >
                 {errorMessage ? 'Start Camera (Basic Mode)' :
-                 modelsLoaded ? 'Start Face Registration' : 'Loading...'}
+                 modelsLoaded ? (enable3DCapture ? 'Start 3D Face Capture' : 'Start Face Registration') : 'Loading...'}
               </Button>
             </div>
           </div>
@@ -644,12 +830,13 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
         <div className="flex gap-3 justify-center">
           <Button
             onClick={modelsLoaded ? captureImage : captureBasicImage}
-            disabled={isProcessing}
+            disabled={isProcessing || is3DCapturing}
             className={cn(buttonVariants({ variant: "royal", size: "lg" }))}
           >
-            {isProcessing ? 'Processing...' : 
+            {isProcessing || is3DCapturing ? 'Processing...' : 
              mode === 'capture' ? 
-               (modelsLoaded ? 'Capture Face (Secure)' : 'Capture Face (Basic)') : 
+               (enable3DCapture ? 'Capture 3D Face' : 
+                modelsLoaded ? 'Capture Face (Secure)' : 'Capture Face (Basic)') : 
                (modelsLoaded ? 'Verify Face (Secure)' : 'Verify Face (Basic)')}
           </Button>
           <Button
@@ -657,9 +844,12 @@ export function FaceRecognition({ onCapture, onVerify, mode }: FaceRecognitionPr
               setIsStreaming(false);
               setLivenessStatus(null);
               setErrorMessage(null);
+              setIs3DCapturing(false);
+              photogrammetryController.current.reset();
             }}
             variant="outline"
             size="lg"
+            disabled={is3DCapturing}
           >
             Stop Camera
           </Button>

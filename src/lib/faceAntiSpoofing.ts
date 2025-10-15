@@ -1,4 +1,5 @@
 import * as faceapi from 'face-api.js';
+import { DepthMapData, computeDepthAntiSpoofingScore } from './face3d';
 
 export interface AntiSpoofingResult {
   isLive: boolean;
@@ -11,6 +12,7 @@ export interface AntiSpoofingResult {
     faceCount: number;
     eyeMovement: number;
     blinkDetection: number;
+    depth3DScore?: number; // Optional real depth score from 3D capture
   };
 }
 
@@ -371,7 +373,8 @@ export class FaceAntiSpoofingAnalyzer {
   
   async analyze(
     video: HTMLVideoElement,
-    detections: FaceDetectionWithLandmarks[]
+    detections: FaceDetectionWithLandmarks[],
+    depthMap?: DepthMapData
   ): Promise<AntiSpoofingResult> {
     
     // Check for single face
@@ -402,21 +405,47 @@ export class FaceAntiSpoofingAnalyzer {
     const motionScore = this.motionAnalyzer.analyzeMotion(landmarks, expressions);
     const reflectionScore = detectScreenReflection(video, landmarks);
     
+    // Compute 3D depth score if available
+    let depth3DScore: number | undefined;
+    if (depthMap) {
+      depth3DScore = computeDepthAntiSpoofingScore(depthMap);
+    }
+
     // Calculate overall confidence
-    const overallConfidence = (
-      depthScore * 0.3 +
-      textureScore * 0.25 +
-      motionScore * 0.3 +
-      reflectionScore * 0.15
-    );
+    // If we have real 3D depth data, weight it heavily
+    let overallConfidence: number;
+    if (depth3DScore !== undefined) {
+      overallConfidence = (
+        depth3DScore * 0.5 +        // Real depth gets highest weight
+        depthScore * 0.15 +          // Landmark-based depth reduced
+        textureScore * 0.15 +
+        motionScore * 0.15 +
+        reflectionScore * 0.05
+      );
+    } else {
+      // Original weighting without 3D depth
+      overallConfidence = (
+        depthScore * 0.3 +
+        textureScore * 0.25 +
+        motionScore * 0.3 +
+        reflectionScore * 0.15
+      );
+    }
     
     // Determine spoofing type based on which test failed most
     let spoofingType: AntiSpoofingResult['spoofingType'];
     if (overallConfidence < 0.6) {
-      if (depthScore < 0.3) spoofingType = 'photo';
-      else if (reflectionScore < 0.3) spoofingType = 'screen';
-      else if (motionScore < 0.3) spoofingType = 'video';
-      else spoofingType = 'deepfake';
+      if (depth3DScore !== undefined && depth3DScore < 0.3) {
+        spoofingType = 'photo'; // Flat surface detected by real depth
+      } else if (depthScore < 0.3) {
+        spoofingType = 'photo';
+      } else if (reflectionScore < 0.3) {
+        spoofingType = 'screen';
+      } else if (motionScore < 0.3) {
+        spoofingType = 'video';
+      } else {
+        spoofingType = 'deepfake';
+      }
     }
     
     const isLive = overallConfidence >= 0.6;
@@ -431,7 +460,8 @@ export class FaceAntiSpoofingAnalyzer {
         motionAnalysis: motionScore,
         faceCount: faceValidation.faceCount,
         eyeMovement: motionScore, // Simplified for now
-        blinkDetection: motionScore // Simplified for now
+        blinkDetection: motionScore, // Simplified for now
+        depth3DScore // Include 3D depth score if available
       }
     };
   }
