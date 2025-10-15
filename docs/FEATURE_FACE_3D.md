@@ -27,9 +27,11 @@ The 3D Face Capture feature enhances the biometric attendance system with suppor
 - Requires supported device and browser
 - Currently a stub implementation requiring full WebXR session setup
 
-#### Native Depth (Future)
-- LiDAR support for iOS devices (requires native bridge)
-- ARCore Depth API for Android devices (requires native bridge)
+#### Native Depth (Capacitor Plugin)
+- LiDAR support for iOS devices via Capacitor bridge
+- ARCore Depth API for Android devices via Capacitor bridge
+- Real-time depth capture from native sensors
+- High-quality depth data (< 1cm accuracy for LiDAR)
 
 ### 3. Biometric Consent Management
 - Required consent dialog before 3D capture
@@ -257,8 +259,8 @@ The feature can be disabled by setting `VITE_ENABLE_FACE_3D_CAPTURE=false` or re
 
 | Platform | Depth Sensor | Native Support |
 |----------|--------------|----------------|
-| iOS 14+  | LiDAR/TrueDepth | 🔄 Future |
-| Android 10+ | ARCore Depth | 🔄 Future |
+| iOS 14+  | LiDAR/TrueDepth | ✅ Capacitor Plugin |
+| Android 10+ | ARCore Depth | ✅ Capacitor Plugin |
 | Desktop  | N/A          | ✅ Photogrammetry |
 | Mobile   | Varies       | ✅ Photogrammetry |
 
@@ -288,19 +290,47 @@ The feature can be disabled by setting `VITE_ENABLE_FACE_3D_CAPTURE=false` or re
 ## Future Enhancements
 
 ### Planned Features
-- [ ] Native mobile integration (Capacitor plugin)
-- [ ] Server-side 3D reconstruction from frames
-- [ ] Real-time depth visualization
-- [ ] Multiple mesh format support
-- [ ] Face embedding comparison algorithms
-- [ ] Automatic quality assessment
+- [x] Native mobile integration (Capacitor plugin)
+- [x] Server-side 3D reconstruction from frames
+- [x] Real-time depth visualization
+- [x] Face embedding computation from 3D data
+- [x] Supabase Edge Functions for processing
+- [ ] Multiple mesh format support (partial - PLY, OBJ supported)
+- [ ] Face embedding comparison algorithms (basic implementation)
+- [ ] Automatic quality assessment (basic implementation)
 - [ ] Progressive enhancement for better devices
 
 ### Integration Points
-- Supabase Edge Functions for processing
-- OpenMVG/OpenMVS for reconstruction
-- Three.js for mesh visualization
-- TensorFlow.js for embedding computation
+- ✅ Supabase Edge Functions for processing (`process-3d-face`, `reconstruct-3d`)
+- ✅ OpenMVG/COLMAP for reconstruction (Docker-based)
+- ✅ Three.js for mesh visualization (DepthVisualizer component)
+- ✅ Custom 3D face embedding computation library
+
+### New Components
+
+#### Capacitor Native Depth Plugin
+- `src/plugins/NativeDepthCapture.ts` - Plugin interface
+- `src/plugins/NativeDepthCaptureWeb.ts` - Web fallback implementation
+- `src/lib/depthAdapters/native.ts` - Native depth adapter
+
+#### 3D Visualization
+- `src/components/3d/DepthVisualizer.tsx` - Real-time Three.js visualization
+- Supports point clouds and depth maps
+- Auto-rotation and interactive viewing
+
+#### Face Embedding
+- `src/lib/face3dEmbedding.ts` - 3D face embedding computation
+- Geometric feature extraction
+- Depth-based features
+- Embedding similarity calculation
+
+#### Edge Functions
+- `supabase/functions/process-3d-face/` - Face data processing
+- `supabase/functions/reconstruct-3d/` - Server-side reconstruction
+
+#### Docker Support
+- `docker/Dockerfile.reconstruction` - OpenMVG/COLMAP container
+- `docker/scripts/reconstruct.sh` - Reconstruction pipeline script
 
 ## Support
 

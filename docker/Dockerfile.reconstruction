@@ -1,0 +1,93 @@
+# Docker image for 3D reconstruction with OpenMVG and COLMAP
+FROM nvidia/cuda:11.8.0-devel-ubuntu22.04
+
+LABEL maintainer="Campus Guard Team"
+LABEL description="3D face reconstruction service with OpenMVG and COLMAP"
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV OPENMVG_VERSION=v2.0
+ENV COLMAP_VERSION=3.8
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    wget \
+    curl \
+    libboost-all-dev \
+    libeigen3-dev \
+    libceres-dev \
+    libgoogle-glog-dev \
+    libgflags-dev \
+    libatlas-base-dev \
+    libsuitesparse-dev \
+    libfreeimage-dev \
+    libmetis-dev \
+    libglu1-mesa-dev \
+    libglew-dev \
+    qtbase5-dev \
+    libqt5opengl5-dev \
+    libcgal-dev \
+    libcgal-qt5-dev \
+    libpng-dev \
+    libjpeg-dev \
+    libtiff-dev \
+    python3 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install OpenMVG
+WORKDIR /tmp
+RUN git clone --recursive https://github.com/openMVG/openMVG.git && \
+    cd openMVG && \
+    git checkout ${OPENMVG_VERSION} && \
+    mkdir build && cd build && \
+    cmake -DCMAKE_BUILD_TYPE=RELEASE \
+          -DCMAKE_INSTALL_PREFIX=/usr/local \
+          .. && \
+    make -j$(nproc) && \
+    make install && \
+    cd /tmp && rm -rf openMVG
+
+# Install COLMAP
+WORKDIR /tmp
+RUN git clone https://github.com/colmap/colmap.git && \
+    cd colmap && \
+    git checkout ${COLMAP_VERSION} && \
+    mkdir build && cd build && \
+    cmake -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_CUDA_ARCHITECTURES=75 \
+          -DCMAKE_INSTALL_PREFIX=/usr/local \
+          .. && \
+    make -j$(nproc) && \
+    make install && \
+    cd /tmp && rm -rf colmap
+
+# Install Python dependencies
+RUN pip3 install --no-cache-dir \
+    numpy \
+    pillow \
+    opencv-python \
+    trimesh \
+    plyfile
+
+# Create working directories
+RUN mkdir -p /workspace/input \
+             /workspace/output \
+             /workspace/temp
+
+# Set working directory
+WORKDIR /workspace
+
+# Copy reconstruction scripts
+COPY scripts/reconstruct.sh /usr/local/bin/reconstruct.sh
+RUN chmod +x /usr/local/bin/reconstruct.sh
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD which colmap && which openMVG_main_SfM || exit 1
+
+# Entry point
+ENTRYPOINT ["/usr/local/bin/reconstruct.sh"]
