@@ -1,6 +1,21 @@
 -- Create biometric-data storage bucket for 3D face data
 -- This migration creates the storage bucket and sets up proper RLS policies
 
+-- Create helper function to check if user is admin
+-- This function checks the profiles table to see if the current user has admin role
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.profiles 
+    WHERE id = auth.uid() AND role = 'admin'
+  );
+$$;
+
 -- Insert the bucket if it doesn't exist
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (
