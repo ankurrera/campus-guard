@@ -621,7 +621,7 @@ export type Database = {
       }
       get_user_role: {
         Args: { user_uuid: string }
-        Returns: Database["public"]["Enums"]["user_role"]
+        Returns: string
       }
       is_admin: {
         Args: Record<PropertyKey, never>

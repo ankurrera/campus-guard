@@ -49,10 +49,16 @@ const TASignup = () => {
     }
 
     try {
-      // Create auth user
+      // Create auth user with TA role metadata
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
+        options: {
+          data: {
+            role: 'ta',
+            name: formData.name
+          }
+        }
       });
 
       if (authError) throw authError;

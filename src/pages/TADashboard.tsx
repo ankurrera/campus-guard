@@ -56,7 +56,7 @@ const TADashboard = () => {
 
       // Fetch assigned courses
       const { data: courseAssignments, error: assignmentError } = await supabase
-        .from('course_assignments')
+        .from('course_tas')
         .select(`
           course_id,
           courses (*)
