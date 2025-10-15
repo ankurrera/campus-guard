@@ -89,7 +89,10 @@ The `user_role` enum has been updated to include:
 12. Copy the contents of `006_add_3d_face_fields.sql`
 13. Paste and execute the SQL commands in the SQL Editor
 14. **Copy the contents of `007_create_biometric_storage_bucket.sql` (REQUIRED for biometric uploads)**
-15. **Paste and execute the SQL commands in the SQL Editor** - This creates the storage bucket and policies
+15. **Paste and execute the SQL commands in the SQL Editor** - This creates:
+    - The `is_admin()` helper function for RLS policies
+    - The storage bucket for biometric data
+    - Proper RLS policies for secure file access
 
 ## Sample Data
 
