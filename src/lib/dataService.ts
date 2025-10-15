@@ -15,7 +15,8 @@ const testSupabaseConnection = async (): Promise<boolean> => {
   
   try {
     const result = await Promise.race([
-      supabase.from('students').select('count').limit(1),
+      // Use an always-selectable table to avoid RLS failures during availability check
+      supabase.from('profiles').select('id').limit(1),
       new Promise<any>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
     ]) as any;
     supabaseAvailable = !result.error;
