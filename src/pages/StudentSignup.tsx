@@ -53,22 +53,25 @@ export default function StudentSignup() {
     if (formData.department) {
       fetchYears(formData.department);
       // Reset year and section when department changes
-      setFormData(prev => ({ ...prev, year: '', section: '' }));
+      setYears([]);
+      setSections([]);
     } else {
       setYears([]);
       setSections([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.department]);
 
   // Fetch sections when year changes
   useEffect(() => {
-    if (formData.year) {
+    if (formData.year && formData.department) {
       fetchSections(formData.department, formData.year);
-      // Reset section when year changes
-      setFormData(prev => ({ ...prev, section: '' }));
+      // Reset sections when year changes
+      setSections([]);
     } else {
       setSections([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.year]);
 
   const fetchDepartments = async () => {
@@ -430,7 +433,7 @@ export default function StudentSignup() {
                 <Label htmlFor="department">Department *</Label>
                 <Select
                   value={formData.department}
-                  onValueChange={(value) => setFormData({ ...formData, department: value })}
+                  onValueChange={(value) => setFormData({ ...formData, department: value, year: '', section: '' })}
                   disabled={loadingDropdowns}
                 >
                   <SelectTrigger id="department">
@@ -450,7 +453,7 @@ export default function StudentSignup() {
                 <Label htmlFor="year">Year *</Label>
                 <Select
                   value={formData.year}
-                  onValueChange={(value) => setFormData({ ...formData, year: value })}
+                  onValueChange={(value) => setFormData({ ...formData, year: value, section: '' })}
                   disabled={!formData.department || loadingDropdowns}
                 >
                   <SelectTrigger id="year">
