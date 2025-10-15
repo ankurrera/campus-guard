@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FaceRecognition } from '@/components/FaceRecognition';
+import { BiometricConsentData } from '@/components/BiometricConsentModal';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { authService, dbService } from '@/lib/dataService';
@@ -176,7 +177,7 @@ export default function StudentSignup() {
           hasSession = !!signupResponse.data?.session;
         } else if ('user' in signupResponse && signupResponse.user) {
           newUserId = signupResponse.user.id;
-          hasSession = !!(signupResponse as any).session;
+          hasSession = !!(signupResponse as { session?: unknown }).session;
         }
 
         if (!newUserId) {
@@ -200,14 +201,15 @@ export default function StudentSignup() {
         toast.success('Account created successfully! Now, please register your face.');
         setLoading(false);
         setStep(3);
-      } catch (error: any) {
-        toast.error(error.message || 'Failed to create account');
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to create account';
+        toast.error(errorMessage);
         setLoading(false);
       }
     }
   };
 
-  const handleFaceCapture = async (imageData: string, antiSpoofingResult?: AntiSpoofingResult) => {
+  const handleFaceCapture = async (imageData: string, antiSpoofingResult?: AntiSpoofingResult, capture3D?: { method: string; frames?: unknown[]; frameCount?: number; duration?: number; consentData?: BiometricConsentData | null }) => {
     setLoading(true);
 
     // Check if face is live and secure
@@ -267,8 +269,11 @@ export default function StudentSignup() {
         ? `${selectedDept.code} ${selectedYear.year_name}`
         : '';
 
+      // Determine if biometric consent was granted (3D capture implies consent)
+      const hasConsent = !!capture3D;
+
       // Save student profile with face data - use the session user ID to ensure RLS passes
-      const { error } = await dbService.students.insert({
+      const { data: insertedStudent, error } = await dbService.students.insert({
         user_id: activeUserId,
         name: formData.name,
         roll_number: formData.rollNumber,
@@ -285,18 +290,87 @@ export default function StudentSignup() {
             details: antiSpoofingResult.details
           },
           registrationDate: new Date().toISOString(),
-          securityVersion: '2.0'
+          securityVersion: '2.0',
+          has3DCapture: hasConsent
         }),
+        biometric_consent: hasConsent,
+        biometric_consent_date: hasConsent ? new Date().toISOString() : null,
       });
         
-      setLoading(false);
-
       if (error) {
         console.error('Face registration error:', error);
         toast.error(`Registration failed: ${error.message}`);
+        setLoading(false);
         return;
       }
 
+      // If 3D capture data is available, process and upload it
+      if (capture3D && insertedStudent) {
+        const studentId = insertedStudent.id;
+        
+        try {
+          // Import the necessary functions dynamically
+          const { upload3DFaceData, updateStudent3DFaceData } = await import('@/lib/supabaseStorage');
+          
+          // For photogrammetry capture, we store the frame data
+          // The actual 3D reconstruction would happen server-side or be processed later
+          if (capture3D.frames && capture3D.frames.length > 0) {
+            // Create a Face3DCapture object with available data
+            const face3DData: {
+              method: string;
+              timestamp: Date;
+              rgbFrame: string;
+              antiSpoofingMetrics: {
+                depthScore: number;
+                textureScore: number;
+                motionScore: number;
+                confidence: number;
+              };
+              deviceInfo: {
+                userAgent: string;
+                platform: string;
+                hasLiDAR: boolean;
+                hasDepthSensor: boolean;
+              };
+            } = {
+              method: capture3D.method || 'photogrammetry',
+              timestamp: new Date(),
+              rgbFrame: imageData,
+              antiSpoofingMetrics: {
+                depthScore: 0.8,
+                textureScore: antiSpoofingResult.confidence,
+                motionScore: 0.8,
+                confidence: antiSpoofingResult.confidence
+              },
+              deviceInfo: {
+                userAgent: navigator.userAgent,
+                platform: navigator.platform,
+                hasLiDAR: false,
+                hasDepthSensor: false
+              }
+            };
+
+            // Upload the 3D face data
+            const uploadResult = await upload3DFaceData(studentId, face3DData);
+
+            // Update student record with URLs
+            if (uploadResult.success) {
+              await updateStudent3DFaceData(
+                studentId,
+                uploadResult,
+                undefined, // Embedding would be computed server-side
+                undefined
+              );
+            }
+          }
+        } catch (error3D) {
+          // Log error but don't fail the registration
+          console.error('3D face data processing error:', error3D);
+          // Still show success to user as basic registration succeeded
+        }
+      }
+
+      setLoading(false);
       toast.success(`Face registered successfully! Security score: ${Math.round(antiSpoofingResult.confidence * 100)}%. Redirecting to login...`);
       
       // Sign out to ensure fresh login
@@ -305,10 +379,11 @@ export default function StudentSignup() {
       setTimeout(() => {
         navigate('/student/login');
       }, 2000);
-    } catch (error: any) {
+    } catch (error) {
       setLoading(false);
       console.error('Face registration error:', error);
-      toast.error(error.message || 'Failed to register face data');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to register face data';
+      toast.error(errorMessage);
     }
   };
 

@@ -20,7 +20,7 @@ import { BiometricConsentModal, BiometricConsentData } from './BiometricConsentM
 import { Switch } from './ui/switch';
 
 interface FaceRecognitionProps {
-  onCapture: (imageData: string, antiSpoofingResult?: AntiSpoofingResult, capture3D?: any) => void;
+  onCapture: (imageData: string, antiSpoofingResult?: AntiSpoofingResult, capture3D?: { method: string; frames?: any[]; frameCount?: number; duration?: number; consentData?: BiometricConsentData | null }) => void;
   onVerify?: (verified: boolean, antiSpoofingResult?: AntiSpoofingResult) => void;
   mode: 'capture' | 'verify';
   studentId?: string; // Required for 3D capture uploads
@@ -429,9 +429,13 @@ export function FaceRecognition({ onCapture, onVerify, mode, studentId }: FaceRe
     }
   };
 
+  // Store consent data when granted
+  const [consentData, setConsentData] = useState<BiometricConsentData | null>(null);
+
   // Handle consent
   const handleConsent = (data: BiometricConsentData) => {
     setHasConsent(true);
+    setConsentData(data);
     setEnable3DCapture(true);
     setShowConsentModal(false);
     toast.success('Biometric consent granted. 3D capture enabled.');
@@ -474,6 +478,7 @@ export function FaceRecognition({ onCapture, onVerify, mode, studentId }: FaceRe
         frames: captureResult.frames,
         frameCount: captureResult.totalFrames,
         duration: captureResult.duration,
+        consentData: consentData,
       });
 
       toast.success('3D face capture completed successfully!');
