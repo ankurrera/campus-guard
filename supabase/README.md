@@ -2,6 +2,8 @@
 
 This document explains how to set up the Teaching Assistant (TA) functionality and dynamic academic information (departments, years, sections) in your Supabase database.
 
+> **Important:** If you're experiencing storage bucket errors ("new row violates row-level security policy" or "Bucket not found"), see [STORAGE_FIX.md](../STORAGE_FIX.md) for instructions on applying migration 007.
+
 ## Tables Added
 
 ### 1. courses
@@ -80,10 +82,14 @@ The `user_role` enum has been updated to include:
 5. Paste and execute the SQL commands in the SQL Editor
 6. Copy the contents of `003_add_student_insert_policy.sql`
 7. Paste and execute the SQL commands in the SQL Editor
-8. Copy the contents of `004_add_academic_info_tables.sql` (NEW)
+8. Copy the contents of `004_add_academic_info_tables.sql`
 9. Paste and execute the SQL commands in the SQL Editor
-10. Copy the contents of `005_add_department_to_ta.sql` (NEW)
+10. Copy the contents of `005_add_department_to_ta.sql`
 11. Paste and execute the SQL commands in the SQL Editor
+12. Copy the contents of `006_add_3d_face_fields.sql`
+13. Paste and execute the SQL commands in the SQL Editor
+14. **Copy the contents of `007_create_biometric_storage_bucket.sql` (REQUIRED for biometric uploads)**
+15. **Paste and execute the SQL commands in the SQL Editor** - This creates the storage bucket and policies
 
 ## Sample Data
 
