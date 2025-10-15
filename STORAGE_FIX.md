@@ -16,6 +16,7 @@ The fix involves two parts:
 
 ### 1. SQL Migration (007_create_biometric_storage_bucket.sql)
 Created a SQL migration that:
+- Defines the `is_admin()` helper function used by RLS policies to check if the current user has admin privileges
 - Creates the `biometric-data` storage bucket directly in the database
 - Sets up proper RLS policies for the bucket to allow authenticated users to:
   - Upload files to their own student folder (`students/{studentId}/...`)
@@ -66,6 +67,25 @@ After applying the migration, you can verify it worked by:
 5. You should see 5 new policies for the `storage.objects` table related to the `biometric-data` bucket
 
 ## Technical Details
+
+### is_admin() Function
+The migration includes a helper function that checks if the current user has admin privileges:
+```sql
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.profiles 
+    WHERE id = auth.uid() AND role = 'admin'
+  );
+$$;
+```
+
+This function is used in the admin RLS policy to grant full access to biometric data for administrators.
 
 ### Storage Policies Created
 1. **Allow authenticated users to upload biometric data**: `INSERT` policy for authenticated users
