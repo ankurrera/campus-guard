@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Users, Calendar, MapPin, Shield, AlertTriangle, 
   TrendingUp, Download, Settings, Search, Filter,
-  Eye, Edit, Trash2, CheckCircle, XCircle, LogOut, Plus
+  Eye, Edit, Trash2, CheckCircle, XCircle, LogOut, Plus, BookOpen
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { SecurityDashboard } from '@/components/SecurityDashboard';
+import { CourseAssignments } from '@/components/CourseAssignments';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { authService, dbService, statsService, getServiceStatus } from '@/lib/dataService';
@@ -221,6 +222,7 @@ export default function AdminDashboard() {
         <Tabs defaultValue="attendance" className="space-y-6">
           <TabsList className="glass-card p-1">
             <TabsTrigger value="attendance">Attendance</TabsTrigger>
+            <TabsTrigger value="courses">Course Assignments</TabsTrigger>
             <TabsTrigger value="security">Security Monitor</TabsTrigger>
             <TabsTrigger value="fraud">Fraud Detection</TabsTrigger>
             <TabsTrigger value="geofence">Geofence Settings</TabsTrigger>
@@ -318,6 +320,11 @@ export default function AdminDashboard() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Course Assignments Tab */}
+          <TabsContent value="courses" className="space-y-6">
+            <CourseAssignments />
           </TabsContent>
 
           {/* Security Monitor Tab */}

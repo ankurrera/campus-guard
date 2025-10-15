@@ -5,6 +5,7 @@ export interface TeachingAssistant {
   employeeId: string;
   phone?: string;
   qualification?: string;
+  department?: string;
   userId: string;
   createdAt: Date;
   updatedAt: Date;

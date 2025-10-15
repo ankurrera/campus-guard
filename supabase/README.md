@@ -24,6 +24,7 @@ Stores TA profile information.
 - `employee_id`: Unique TA employee ID
 - `phone`: Phone number (optional)
 - `qualification`: Educational qualification (optional)
+- `department`: Department name (optional, for filtering course assignments)
 - `created_at`, `updated_at`: Timestamps
 
 ### 3. course_assignments
@@ -81,6 +82,8 @@ The `user_role` enum has been updated to include:
 7. Paste and execute the SQL commands in the SQL Editor
 8. Copy the contents of `004_add_academic_info_tables.sql` (NEW)
 9. Paste and execute the SQL commands in the SQL Editor
+10. Copy the contents of `005_add_department_to_ta.sql` (NEW)
+11. Paste and execute the SQL commands in the SQL Editor
 
 ## Sample Data
 
@@ -127,9 +130,32 @@ The student registration form now uses dynamic dropdowns:
 
 After running the migration:
 1. TAs can register using the `/ta/signup` page
-2. Admins can assign TAs to courses through the admin dashboard
+2. Admins can assign TAs to courses through the admin dashboard (Course Assignments tab)
 3. TAs can access their dashboard at `/ta/dashboard`
 4. Students can register with dynamic department/year/section selection at `/student/signup`
+
+## Admin Dashboard Course Assignments Feature (NEW)
+
+Admins can now manage TA course assignments through a dedicated "Course Assignments" tab in the admin dashboard.
+
+### Features
+1. **Department-Based Filtering**: Select a department to view only relevant courses, TAs, and assignments
+2. **View Assignments**: See all current course assignments in a table format with department, course details, and TA information
+3. **Create Assignment**: Assign a TA to a course within the same department using a modal form
+4. **Edit Assignment**: Modify existing assignments (change TA or course)
+5. **Delete Assignment**: Remove course assignments
+6. **Search**: Filter assignments by TA name, course name, or course code
+
+### Workflow
+1. Navigate to Admin Dashboard → Course Assignments tab
+2. Select a department from the dropdown filter
+3. View existing assignments or click "Assign Course" to create a new one
+4. In the assignment modal:
+   - Department is auto-filled based on your filter selection
+   - Select a TA from the dropdown (filtered to show only TAs in that department)
+   - Select a course from the dropdown (filtered to show only courses in that department)
+   - Submit to create the assignment
+5. Use Edit/Delete buttons to modify or remove assignments
 
 ## TA Workflow
 
