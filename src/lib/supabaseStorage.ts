@@ -19,6 +19,8 @@ export interface UploadResult {
 /**
  * Initialize biometric storage bucket
  * This should be run once during setup
+ * Note: The bucket is now created via SQL migration (007_create_biometric_storage_bucket.sql)
+ * This function is kept for backwards compatibility but no longer creates the bucket
  */
 export async function initializeBiometricBucket(): Promise<void> {
   try {
@@ -27,21 +29,11 @@ export async function initializeBiometricBucket(): Promise<void> {
     const bucketExists = buckets?.some(b => b.name === BIOMETRIC_BUCKET);
 
     if (!bucketExists) {
-      // Create bucket with appropriate policies
-      await supabase.storage.createBucket(BIOMETRIC_BUCKET, {
-        public: false, // Private bucket for security
-        fileSizeLimit: 50 * 1024 * 1024, // 50MB limit
-        allowedMimeTypes: [
-          'model/gltf-binary',
-          'model/obj',
-          'application/octet-stream',
-          'image/png',
-          'image/jpeg',
-          'text/plain', // for PLY files
-        ],
-      });
-      console.log('Biometric storage bucket created successfully');
+      console.warn('Biometric storage bucket does not exist. Please run the SQL migration: 007_create_biometric_storage_bucket.sql');
+      throw new Error('Biometric storage bucket not found. Please contact administrator to run database migration.');
     }
+    
+    console.log('Biometric storage bucket verified successfully');
   } catch (error) {
     console.error('Error initializing biometric bucket:', error);
     throw error;
@@ -50,7 +42,8 @@ export async function initializeBiometricBucket(): Promise<void> {
 
 /**
  * Ensure bucket exists before operations
- * Internal helper that silently ensures bucket is available
+ * Internal helper that verifies bucket is available
+ * The bucket should be created via SQL migration (007_create_biometric_storage_bucket.sql)
  */
 async function ensureBucketExists(): Promise<void> {
   try {
@@ -59,30 +52,13 @@ async function ensureBucketExists(): Promise<void> {
     const bucketExists = buckets?.some(b => b.name === BIOMETRIC_BUCKET);
 
     if (!bucketExists) {
-      // Create bucket with appropriate policies
-      const { error } = await supabase.storage.createBucket(BIOMETRIC_BUCKET, {
-        public: false, // Private bucket for security
-        fileSizeLimit: 50 * 1024 * 1024, // 50MB limit
-        allowedMimeTypes: [
-          'model/gltf-binary',
-          'model/obj',
-          'application/octet-stream',
-          'image/png',
-          'image/jpeg',
-          'text/plain', // for PLY files
-        ],
-      });
-      
-      if (error) {
-        throw error;
-      }
-      
-      console.log('Biometric storage bucket created automatically');
+      console.error('Biometric storage bucket does not exist. Please ensure the SQL migration (007_create_biometric_storage_bucket.sql) has been applied.');
+      throw new Error('Biometric storage bucket not found. Please contact administrator.');
     }
   } catch (error) {
-    // If bucket creation fails, log the error but don't throw
-    // This allows the upload to continue and fail with a more specific error
+    // If bucket check fails, log the error and throw
     console.error('Error ensuring bucket exists:', error);
+    throw error;
   }
 }
 
