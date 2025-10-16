@@ -6,6 +6,15 @@ This document explains how to set up the Teaching Assistant (TA) functionality a
 
 ## Tables Added
 
+### 0. profiles (REQUIRED - Base Table)
+Stores basic profile information and roles for all authenticated users. **This table must exist before other migrations run.**
+- `id`: Primary key (UUID), references auth.users
+- `display_name`: User's display name
+- `role`: User role (student, ta, admin, faculty)
+- `created_at`, `updated_at`: Timestamps
+
+**Note**: This table is created by migration `000_create_profiles_table.sql` and is required for the `get_user_role()` function and `handle_new_user()` trigger to work properly.
+
 ### 1. courses
 Stores course information that TAs can be assigned to.
 - `id`: Primary key (UUID)
@@ -74,22 +83,29 @@ The `user_role` enum has been updated to include:
 2. Link your project: `supabase link --project-ref YOUR_PROJECT_ID`
 3. Apply the migration: `supabase db push`
 
+**Note**: Migrations are applied in alphabetical order. The `000_create_profiles_table.sql` migration runs first to create the required base table.
+
 ### Option 2: Manual SQL Execution
-1. Copy the contents of `001_add_ta_tables.sql`
+**IMPORTANT**: Apply migrations in this order:
+1. **Copy the contents of `000_create_profiles_table.sql` (REQUIRED FIRST)**
+2. **Paste and execute in SQL Editor** - This creates the base profiles table needed by all other migrations
+3. Copy the contents of `001_add_ta_tables.sql`
 2. Go to your Supabase dashboard → SQL Editor
 3. Paste and execute the SQL commands
-4. Copy the contents of `002_add_ta_insert_policy.sql`
+4. Copy the contents of `001_add_ta_tables.sql`
 5. Paste and execute the SQL commands in the SQL Editor
-6. Copy the contents of `003_add_student_insert_policy.sql`
+6. Copy the contents of `002_add_ta_insert_policy.sql`
 7. Paste and execute the SQL commands in the SQL Editor
-8. Copy the contents of `004_add_academic_info_tables.sql`
+8. Copy the contents of `003_add_student_insert_policy.sql`
 9. Paste and execute the SQL commands in the SQL Editor
-10. Copy the contents of `005_add_department_to_ta.sql`
+10. Copy the contents of `004_add_academic_info_tables.sql`
 11. Paste and execute the SQL commands in the SQL Editor
-12. Copy the contents of `006_add_3d_face_fields.sql`
+12. Copy the contents of `005_add_department_to_ta.sql`
 13. Paste and execute the SQL commands in the SQL Editor
-14. **Copy the contents of `007_create_biometric_storage_bucket.sql` (REQUIRED for biometric uploads)**
-15. **Paste and execute the SQL commands in the SQL Editor** - This creates:
+14. Copy the contents of `006_add_3d_face_fields.sql`
+15. Paste and execute the SQL commands in the SQL Editor
+16. **Copy the contents of `007_create_biometric_storage_bucket.sql` (REQUIRED for biometric uploads)**
+17. **Paste and execute the SQL commands in the SQL Editor** - This creates:
     - The `is_admin()` helper function for RLS policies
     - The storage bucket for biometric data
     - Proper RLS policies for secure file access
