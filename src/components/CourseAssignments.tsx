@@ -37,6 +37,7 @@ interface Course {
 
 interface TeachingAssistant {
   id: string;
+  user_id: string;
   name: string;
   email: string;
   department: string;
@@ -120,11 +121,19 @@ export function CourseAssignments() {
         .eq('department', deptName)
         .order('name');
 
-      if (tasError) throw tasError;
+      if (tasError) {
+        console.error('Error loading TAs:', tasError);
+        throw tasError;
+      }
+      console.log('Loaded TAs:', tasData?.length || 0, 'TAs for department:', deptName);
+      if (tasData && tasData.length > 0) {
+        console.log('Sample TA data:', tasData[0]);
+      }
       setTeachingAssistants(tasData || []);
 
       // Load assignments for this department - filter by TAs from this department
-      const taIds = (tasData || []).map(ta => ta.id);
+      // Note: course_tas.ta_id references profiles.id, which is teaching_assistants.user_id
+      const taUserIds = (tasData || []).map(ta => ta.user_id);
       
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from('course_tas')
@@ -134,14 +143,18 @@ export function CourseAssignments() {
           course_id,
           assigned_at
         `)
-        .in('ta_id', taIds)
+        .in('ta_id', taUserIds)
         .order('assigned_at', { ascending: false });
 
-      if (assignmentsError) throw assignmentsError;
+      if (assignmentsError) {
+        console.error('Error loading assignments:', assignmentsError);
+        throw assignmentsError;
+      }
+      console.log('Loaded assignments:', assignmentsData?.length || 0);
 
       // Enrich assignments with TA and course data
       const enrichedAssignments = (assignmentsData || []).map((assignment: any) => {
-        const ta = tasData?.find(t => t.id === assignment.ta_id);
+        const ta = tasData?.find(t => t.user_id === assignment.ta_id);
         const course = coursesData?.find(c => c.id === assignment.course_id);
         return {
           ...assignment,
@@ -220,10 +233,11 @@ export function CourseAssignments() {
       loadDepartmentData();
     } catch (error: any) {
       console.error('Error saving assignment:', error);
+      console.error('Assignment details - TA ID:', selectedTA, 'Course ID:', selectedCourse);
       if (error.code === '23505') {
         toast.error('This TA is already assigned to this course');
       } else {
-        toast.error('Failed to save assignment');
+        toast.error(`Failed to save assignment: ${error.message || 'Unknown error'}`);
       }
     }
   };
@@ -405,7 +419,7 @@ export function CourseAssignments() {
                       </div>
                     ) : (
                       teachingAssistants.map((ta) => (
-                        <SelectItem key={ta.id} value={ta.id}>
+                        <SelectItem key={ta.id} value={ta.user_id}>
                           {ta.name} ({ta.email})
                         </SelectItem>
                       ))
