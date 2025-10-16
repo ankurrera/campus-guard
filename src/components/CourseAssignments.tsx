@@ -101,10 +101,6 @@ export function CourseAssignments() {
     
     setLoading(true);
     try {
-      // Get department name for filtering
-      const dept = departments.find(d => d.id === selectedDepartment);
-      const deptName = dept?.name || '';
-
       // Load courses for this department (courses don't have department field, load all)
       const { data: coursesData, error: coursesError } = await supabase
         .from('courses')
@@ -130,7 +126,7 @@ export function CourseAssignments() {
       }
       setTeachingAssistants(tasData || []);
 
-      // Load assignments for this department - filter by TAs from this department
+      // Load assignments for all TAs
       // Note: course_tas.ta_id references profiles.id, which is teaching_assistants.user_id
       const taUserIds = (tasData || []).map(ta => ta.user_id);
       
