@@ -68,6 +68,21 @@ Stores section information linked to departments and years.
 - `section_name`: Section identifier (e.g., "A", "B", "C", "D")
 - `created_at`, `updated_at`: Timestamps
 
+### 7. semesters (NEW)
+Stores semester information linked to years (2 semesters per year).
+- `id`: Primary key (UUID)
+- `year_id`: References years.id
+- `semester_number`: Semester number (1 or 2)
+- `semester_name`: Display name (e.g., "Semester 1", "Semester 2")
+- `created_at`, `updated_at`: Timestamps
+
+### 8. department_course_map (NEW)
+Maps subjects (courses) to specific semesters.
+- `id`: Primary key (UUID)
+- `semester_id`: References semesters.id
+- `course_id`: References courses.id (from centralized courses pool)
+- `created_at`, `updated_at`: Timestamps
+
 ## User Role Updates
 
 The `user_role` enum has been updated to include:
@@ -109,6 +124,14 @@ The `user_role` enum has been updated to include:
     - The `is_admin()` helper function for RLS policies
     - The storage bucket for biometric data
     - Proper RLS policies for secure file access
+18. Copy the contents of `008_add_admin_course_tas_policies.sql`
+19. Paste and execute the SQL commands in the SQL Editor
+20. **Copy the contents of `009_add_semesters_and_course_mapping.sql` (NEW - for semester and course mapping)**
+21. **Paste and execute the SQL commands in the SQL Editor** - This creates:
+    - The `semesters` table for semester management
+    - The `department_course_map` table for course-semester mapping
+    - Auto-creation triggers for years and semesters
+    - RLS policies for semester and course mapping data
 
 ## Sample Data
 
@@ -124,16 +147,19 @@ The migration includes sample academic structure:
 - Departments: CSE, ECE, ME, CE
 - Years: 1st Year, 2nd Year, 3rd Year, 4th Year (for each department)
 - Sections: A, B, C, D (for each department-year combination)
+- Semesters: Semester 1 and Semester 2 (for each year, totaling 8 per department)
 
 ## Security Policies
 
 Row Level Security (RLS) is enabled with these policies:
 - Anyone can view courses
-- Anyone can view departments, years, and sections (NEW)
+- Anyone can view departments, years, sections, and semesters (NEW)
+- Anyone can view department course mappings (NEW)
 - Authenticated users can insert their own TA profile during signup
 - Authenticated users can insert their own student profile during signup
 - TAs can view/update their own profile
 - TAs can view their course assignments
+- Admins can manage semesters and department course mappings (NEW)
 - Admin access needs to be configured based on your existing admin setup
 
 ## Student Registration Changes (NEW)
@@ -158,6 +184,21 @@ After running the migration:
 2. Admins can assign TAs to courses through the admin dashboard (Course Assignments tab)
 3. TAs can access their dashboard at `/ta/dashboard`
 4. Students can register with dynamic department/year/section selection at `/student/signup`
+
+## Automatic Data Generation (NEW)
+
+When a new department is created:
+1. **4 years are automatically generated** (1st Year, 2nd Year, 3rd Year, 4th Year)
+2. **For each year, 2 semesters are automatically created** (Semester 1, Semester 2)
+3. This results in **8 semesters total per department** (4 years × 2 semesters)
+
+This automation ensures:
+- Consistent academic structure across all departments
+- No manual intervention needed for basic setup
+- Immediate availability of year and semester data for new departments
+
+Admins can then assign courses to specific semesters using the `department_course_map` table, creating the complete hierarchy:
+- Department → Year → Semester → Courses
 
 ## Admin Dashboard Course Assignments Feature (NEW)
 
