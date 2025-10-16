@@ -309,7 +309,23 @@ export default function StudentSignup() {
         const studentId = insertedStudent.id;
         
         try {
-          // Call the edge function to process 3D reconstruction
+          // First, compute embedding and store depth/point cloud URLs if available
+          if (capture3D.frames && capture3D.frames.length > 0) {
+            const { data: processResult, error: processError } = await supabase.functions.invoke('process-3d-face', {
+              body: {
+                studentId,
+                frames: capture3D.frames,
+                rgbFrameUrl: imageData,
+              }
+            });
+            if (processError) {
+              console.error('process-3d-face error:', processError);
+            } else {
+              console.log('process-3d-face result:', processResult);
+            }
+          }
+          
+          // Then call the edge function to process 3D reconstruction
           if (capture3D.frames && capture3D.frames.length > 0) {
             console.log(`Processing 3D reconstruction for student ${studentId} with ${capture3D.frames.length} frames`);
             

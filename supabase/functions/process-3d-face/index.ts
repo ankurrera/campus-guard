@@ -107,24 +107,39 @@ serve(async (req) => {
     }
 
     // Step 5: Update database with results
-    if (response.embedding) {
-      const embeddingBase64 = btoa(String.fromCharCode(...new Uint8Array(new Float32Array(response.embedding).buffer)));
-      
-      const { error: updateError } = await supabase
-        .from('students')
-        .update({
-          face_embedding: embeddingBase64,
-          face_embedding_algorithm: response.embeddingAlgorithm,
-        })
-        .eq('id', studentId);
+    {
+      const updateData: Record<string, any> = {};
 
-      if (updateError) {
-        console.error('Failed to update student record:', updateError);
-        response.error = 'Failed to update database';
-        return new Response(JSON.stringify(response), {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+      if (response.embedding) {
+        const embeddingBase64 = btoa(
+          String.fromCharCode(...new Uint8Array(new Float32Array(response.embedding).buffer))
+        );
+        updateData.face_embedding = embeddingBase64;
+        updateData.face_embedding_algorithm = response.embeddingAlgorithm;
+      }
+
+      // Persist depth/point cloud URLs when available
+      if (depthMapUrl) {
+        updateData.face_depthmap_url = depthMapUrl;
+      }
+      if (response.pointCloudUrl || pointCloudUrl) {
+        updateData.face_pointcloud_url = response.pointCloudUrl ?? pointCloudUrl;
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        const { error: updateError } = await supabase
+          .from('students')
+          .update(updateData)
+          .eq('id', studentId);
+
+        if (updateError) {
+          console.error('Failed to update student record:', updateError);
+          response.error = 'Failed to update database';
+          return new Response(JSON.stringify(response), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
       }
     }
 
