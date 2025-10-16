@@ -101,10 +101,6 @@ export function CourseAssignments() {
     
     setLoading(true);
     try {
-      // Get department name for filtering
-      const dept = departments.find(d => d.id === selectedDepartment);
-      const deptName = dept?.name || '';
-
       // Load courses for this department (courses don't have department field, load all)
       const { data: coursesData, error: coursesError } = await supabase
         .from('courses')
@@ -114,24 +110,23 @@ export function CourseAssignments() {
       if (coursesError) throw coursesError;
       setCourses(coursesData || []);
 
-      // Load TAs for this department
+      // Load all TAs (admins can assign any TA to any course)
       const { data: tasData, error: tasError } = await supabase
         .from('teaching_assistants')
         .select('id, name, email, department')
-        .eq('department', deptName)
         .order('name');
 
       if (tasError) {
         console.error('Error loading TAs:', tasError);
         throw tasError;
       }
-      console.log('Loaded TAs:', tasData?.length || 0, 'TAs for department:', deptName);
+      console.log('Loaded TAs:', tasData?.length || 0, 'TAs (all departments)');
       if (tasData && tasData.length > 0) {
         console.log('Sample TA data:', tasData[0]);
       }
       setTeachingAssistants(tasData || []);
 
-      // Load assignments for this department - filter by TAs from this department
+      // Load assignments for all TAs
       // Note: course_tas.ta_id references profiles.id, which is teaching_assistants.user_id
       const taUserIds = (tasData || []).map(ta => ta.user_id);
       
@@ -392,7 +387,7 @@ export function CourseAssignments() {
               {isEditing ? 'Edit Assignment' : 'Create New Assignment'}
             </DialogTitle>
             <DialogDescription>
-              Assign a course to a teaching assistant within the selected department.
+              Assign a course to any teaching assistant in the system.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit}>
@@ -415,7 +410,7 @@ export function CourseAssignments() {
                   <SelectContent>
                     {teachingAssistants.length === 0 ? (
                       <div className="p-2 text-sm text-muted-foreground">
-                        No TAs available in this department
+                        No TAs available in the system
                       </div>
                     ) : (
                       teachingAssistants.map((ta) => (
