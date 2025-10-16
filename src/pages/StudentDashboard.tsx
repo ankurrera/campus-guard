@@ -312,7 +312,7 @@ export default function StudentDashboard() {
             fraudScore: fraudAnalysis.fraudScore,
             faceMatchScore: matchResult.similarityScore
           },
-          fraud_attempts: (fraudAnalysis.fraudAttempt ? [fraudAnalysis.fraudAttempt] : null) as any
+          fraud_attempts: (fraudAnalysis.fraudAttempt ? [fraudAnalysis.fraudAttempt] : null) as unknown as Database['public']['Tables']['attendance_records']['Insert']['fraud_attempts']
         });
 
         if (error) throw error;
