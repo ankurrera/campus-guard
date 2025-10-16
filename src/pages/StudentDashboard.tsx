@@ -51,7 +51,7 @@ export default function StudentDashboard() {
   const fetchStudentData = useCallback(async () => {
     try {
       // Demo mode: use demo student data if no authentication
-      const demoStudent: Student = {
+      const demoStudent = {
         id: 'demo_student',
         user_id: 'demo_user',
         name: 'Demo Student',
@@ -61,6 +61,13 @@ export default function StudentDashboard() {
         class: 'CSE 2nd Year',
         section: 'A',
         face_data: 'demo_face_data',
+        face_mesh_url: null,
+        face_pointcloud_url: null,
+        face_depthmap_url: null,
+        face_embedding: null,
+        face_embedding_algorithm: null,
+        biometric_consent: false,
+        biometric_consent_date: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };

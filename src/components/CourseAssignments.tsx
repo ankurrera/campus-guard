@@ -30,9 +30,9 @@ interface Department {
 
 interface Course {
   id: string;
-  name: string;
+  title: string;
   code: string;
-  department: string;
+  description?: string;
 }
 
 interface TeachingAssistant {
@@ -104,11 +104,10 @@ export function CourseAssignments() {
       const dept = departments.find(d => d.id === selectedDepartment);
       const deptName = dept?.name || '';
 
-      // Load courses for this department
+      // Load courses for this department (courses don't have department field, load all)
       const { data: coursesData, error: coursesError } = await supabase
         .from('courses')
         .select('*')
-        .eq('department', deptName)
         .order('code');
 
       if (coursesError) throw coursesError;
@@ -124,37 +123,34 @@ export function CourseAssignments() {
       if (tasError) throw tasError;
       setTeachingAssistants(tasData || []);
 
-      // Load assignments for this department
+      // Load assignments for this department - filter by TAs from this department
+      const taIds = (tasData || []).map(ta => ta.id);
+      
       const { data: assignmentsData, error: assignmentsError } = await supabase
-        .from('course_assignments')
+        .from('course_tas')
         .select(`
           id,
           ta_id,
           course_id,
-          assigned_at,
-          teaching_assistants:ta_id (
-            id,
-            name,
-            email,
-            department
-          ),
-          courses:course_id (
-            id,
-            name,
-            code,
-            department
-          )
+          assigned_at
         `)
+        .in('ta_id', taIds)
         .order('assigned_at', { ascending: false });
 
       if (assignmentsError) throw assignmentsError;
 
-      // Filter assignments by department
-      const filteredAssignments = (assignmentsData || []).filter(
-        (assignment: CourseAssignment) => assignment.courses?.department === deptName
-      );
+      // Enrich assignments with TA and course data
+      const enrichedAssignments = (assignmentsData || []).map((assignment: any) => {
+        const ta = tasData?.find(t => t.id === assignment.ta_id);
+        const course = coursesData?.find(c => c.id === assignment.course_id);
+        return {
+          ...assignment,
+          teaching_assistants: ta,
+          courses: course,
+        };
+      });
       
-      setAssignments(filteredAssignments as CourseAssignment[]);
+      setAssignments(enrichedAssignments as CourseAssignment[]);
     } catch (error) {
       console.error('Error loading department data:', error);
       toast.error('Failed to load department data');
@@ -198,7 +194,7 @@ export function CourseAssignments() {
       if (isEditing && currentAssignment) {
         // Update existing assignment
         const { error } = await supabase
-          .from('course_assignments')
+          .from('course_tas')
           .update({
             ta_id: selectedTA,
             course_id: selectedCourse,
@@ -210,7 +206,7 @@ export function CourseAssignments() {
       } else {
         // Create new assignment
         const { error } = await supabase
-          .from('course_assignments')
+          .from('course_tas')
           .insert({
             ta_id: selectedTA,
             course_id: selectedCourse,
@@ -240,7 +236,7 @@ export function CourseAssignments() {
 
     try {
       const { error } = await supabase
-        .from('course_assignments')
+        .from('course_tas')
         .delete()
         .eq('id', assignmentId);
 
@@ -255,13 +251,13 @@ export function CourseAssignments() {
 
   const filteredAssignments = assignments.filter((assignment) => {
     const taName = assignment.teaching_assistants?.name || '';
-    const courseName = assignment.courses?.name || '';
+    const courseTitle = assignment.courses?.title || '';
     const courseCode = assignment.courses?.code || '';
     const query = searchQuery.toLowerCase();
     
     return (
       taName.toLowerCase().includes(query) ||
-      courseName.toLowerCase().includes(query) ||
+      courseTitle.toLowerCase().includes(query) ||
       courseCode.toLowerCase().includes(query)
     );
   });
@@ -339,8 +335,8 @@ export function CourseAssignments() {
                         key={assignment.id}
                         className="border-b hover:bg-muted/50 transition-colors"
                       >
-                        <td className="p-4">{assignment.courses?.department || 'N/A'}</td>
-                        <td className="p-4 font-medium">{assignment.courses?.name || 'N/A'}</td>
+                        <td className="p-4">{assignment.teaching_assistants?.department || 'N/A'}</td>
+                        <td className="p-4 font-medium">{assignment.courses?.title || 'N/A'}</td>
                         <td className="p-4">{assignment.courses?.code || 'N/A'}</td>
                         <td className="p-4">{assignment.teaching_assistants?.name || 'N/A'}</td>
                         <td className="p-4 text-sm text-muted-foreground">
@@ -431,7 +427,7 @@ export function CourseAssignments() {
                     ) : (
                       courses.map((course) => (
                         <SelectItem key={course.id} value={course.id}>
-                          {course.code} - {course.name}
+                          {course.code} - {course.title}
                         </SelectItem>
                       ))
                     )}

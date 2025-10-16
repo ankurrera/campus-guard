@@ -11,7 +11,7 @@ export interface MultiViewFrame {
   angle: number; // rotation angle in degrees
 }
 
-export interface PhotogrammetryCapture {
+export interface PhotogrammetryCaptureResult {
   frames: MultiViewFrame[];
   duration: number;
   totalFrames: number;
@@ -34,7 +34,7 @@ export interface CaptureInstructions {
 export class PhotogrammetryCapture {
   private video: HTMLVideoElement | null = null;
   private canvas: HTMLCanvasElement;
-  private frames: MultiViewFrame[] = [];
+  private capturedFrames: MultiViewFrame[] = [];
   private captureInterval: number | null = null;
   private startTime: Date | null = null;
   private onProgress: ((instructions: CaptureInstructions) => void) | null = null;
@@ -54,10 +54,10 @@ export class PhotogrammetryCapture {
   async start(
     video: HTMLVideoElement,
     onProgress?: (instructions: CaptureInstructions) => void
-  ): Promise<PhotogrammetryCapture> {
+  ): Promise<PhotogrammetryCaptureResult> {
     this.video = video;
     this.onProgress = onProgress || null;
-    this.frames = [];
+    this.capturedFrames = [];
 
     // Configure canvas
     this.canvas.width = video.videoWidth || 640;
@@ -70,99 +70,105 @@ export class PhotogrammetryCapture {
     await this.captureFrames();
 
     return {
-      frames: this.frames,
+      frames: this.capturedFrames,
       duration: Date.now() - (this.startTime?.getTime() || 0),
-      totalFrames: this.frames.length,
+      totalFrames: this.capturedFrames.length,
       completed: true,
     };
   }
 
   /**
-   * Countdown before starting capture
+   * Countdown before capture
    */
   private async countdown(): Promise<void> {
-    for (let i = this.countdownDuration; i > 0; i--) {
-      this.onProgress?.({
-        phase: 'countdown',
-        currentFrame: 0,
-        totalFrames: this.targetFrameCount,
-        countdown: i,
-        message: `Get ready! Starting in ${i}...`,
-      });
-      await this.sleep(1000);
-    }
+    return new Promise((resolve) => {
+      let count = this.countdownDuration;
+
+      const tick = () => {
+        if (this.onProgress) {
+          this.onProgress({
+            phase: 'countdown',
+            currentFrame: 0,
+            totalFrames: this.targetFrameCount,
+            countdown: count,
+            message: `Get ready! Starting in ${count}...`,
+          });
+        }
+
+        count--;
+        if (count > 0) {
+          setTimeout(tick, 1000);
+        } else {
+          resolve();
+        }
+      };
+
+      tick();
+    });
   }
 
   /**
-   * Capture frames over the specified duration
+   * Capture frames in sequence
    */
   private async captureFrames(): Promise<void> {
-    this.startTime = new Date();
-    const frameInterval = this.captureDuration / this.targetFrameCount;
-
-    this.onProgress?.({
-      phase: 'capturing',
-      currentFrame: 0,
-      totalFrames: this.targetFrameCount,
-      countdown: 0,
-      message: 'Slowly rotate your head left and right...',
-    });
-
-    let frameCount = 0;
-    
     return new Promise((resolve) => {
+      this.startTime = new Date();
+      const frameInterval = this.captureDuration / this.targetFrameCount;
+      let frameCount = 0;
+
       this.captureInterval = window.setInterval(() => {
-        if (frameCount >= this.targetFrameCount) {
+        if (frameCount >= this.targetFrameCount || !this.video) {
           this.stopCapture();
-          this.onProgress?.({
-            phase: 'completed',
-            currentFrame: this.targetFrameCount,
-            totalFrames: this.targetFrameCount,
-            countdown: 0,
-            message: 'Capture complete! Processing...',
-          });
           resolve();
           return;
         }
 
-        this.captureFrame(frameCount);
+        // Capture current frame
+        const frame = this.captureFrame(frameCount);
+        if (frame) {
+          this.capturedFrames.push(frame);
+        }
+
         frameCount++;
 
-        this.onProgress?.({
-          phase: 'capturing',
-          currentFrame: frameCount,
-          totalFrames: this.targetFrameCount,
-          countdown: 0,
-          message: `Capturing frame ${frameCount}/${this.targetFrameCount}...`,
-        });
+        // Update progress
+        if (this.onProgress) {
+          const angle = (frameCount / this.targetFrameCount) * 360;
+          this.onProgress({
+            phase: 'capturing',
+            currentFrame: frameCount,
+            totalFrames: this.targetFrameCount,
+            countdown: 0,
+            message: this.getInstructionForAngle(angle),
+          });
+        }
       }, frameInterval);
     });
   }
 
   /**
-   * Capture a single frame
+   * Capture single frame from video
    */
-  private captureFrame(frameIndex: number): void {
-    if (!this.video) return;
+  private captureFrame(index: number): MultiViewFrame | null {
+    if (!this.video || !this.canvas) return null;
 
     const ctx = this.canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) return null;
 
-    // Draw current video frame
+    // Draw current video frame to canvas
     ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
 
-    // Get image data
-    const imageData = this.canvas.toDataURL('image/jpeg', 0.85);
+    // Convert to base64
+    const imageData = this.canvas.toDataURL('image/jpeg', 0.95);
 
-    // Calculate approximate angle based on frame position
-    // Assuming user rotates head about 60 degrees total over capture
-    const angle = -30 + (frameIndex / this.targetFrameCount) * 60;
+    // Calculate angle based on frame index
+    const angle = (index / this.targetFrameCount) * 360;
 
-    this.frames.push({
+    return {
       imageData,
       timestamp: new Date(),
       angle,
-    });
+    };
   }
 
   /**
@@ -173,69 +179,74 @@ export class PhotogrammetryCapture {
       clearInterval(this.captureInterval);
       this.captureInterval = null;
     }
+
+    if (this.onProgress) {
+      this.onProgress({
+        phase: 'completed',
+        currentFrame: this.capturedFrames.length,
+        totalFrames: this.targetFrameCount,
+        countdown: 0,
+        message: 'Capture complete! Processing frames...',
+      });
+    }
   }
 
   /**
-   * Utility: sleep for specified milliseconds
+   * Get instruction message for current angle
    */
-  private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+  private getInstructionForAngle(angle: number): string {
+    if (angle < 45) {
+      return 'Hold steady, looking straight ahead...';
+    } else if (angle < 90) {
+      return 'Slowly turn your head to the left...';
+    } else if (angle < 135) {
+      return 'Continue turning left...';
+    } else if (angle < 180) {
+      return 'Keep turning, almost halfway...';
+    } else if (angle < 225) {
+      return 'Great! Now turn your head to the right...';
+    } else if (angle < 270) {
+      return 'Continue turning right...';
+    } else if (angle < 315) {
+      return 'Almost done, keep turning...';
+    } else {
+      return 'Final frames, looking straight ahead...';
+    }
   }
 
   /**
-   * Reset capture state
+   * Clean up resources
    */
-  reset(): void {
+  cleanup(): void {
     this.stopCapture();
-    this.frames = [];
-    this.startTime = null;
-  }
-
-  /**
-   * Get captured frames
-   */
-  getFrames(): MultiViewFrame[] {
-    return this.frames;
-  }
-
-  /**
-   * Export frames for upload
-   */
-  exportForUpload(): {
-    frameCount: number;
-    duration: number;
-    frames: string[]; // base64 images
-  } {
-    return {
-      frameCount: this.frames.length,
-      duration: Date.now() - (this.startTime?.getTime() || 0),
-      frames: this.frames.map(f => f.imageData),
-    };
+    this.video = null;
+    this.capturedFrames = [];
   }
 }
 
 /**
- * Validate photogrammetry capture quality
+ * Convert captured frames to 3D face capture data
  */
-export function validatePhotogrammetryCapture(
-  capture: PhotogrammetryCapture
-): { valid: boolean; issues: string[] } {
-  const issues: string[] = [];
-
-  if (capture.totalFrames < 20) {
-    issues.push('Insufficient frames captured (minimum 20 required)');
+export function framesToFace3DCapture(
+  result: PhotogrammetryCaptureResult,
+  rgbFrame: string,
+  antiSpoofingMetrics: {
+    depthScore: number;
+    textureScore: number;
+    motionScore: number;
+    confidence: number;
   }
-
-  if (capture.duration < 5000) {
-    issues.push('Capture duration too short (minimum 5 seconds)');
-  }
-
-  if (capture.frames.length < capture.totalFrames * 0.8) {
-    issues.push('Too many frames dropped during capture');
-  }
-
+): Partial<Face3DCapture> {
   return {
-    valid: issues.length === 0,
-    issues,
+    method: 'photogrammetry',
+    timestamp: new Date(),
+    rgbFrame,
+    antiSpoofingMetrics,
+    deviceInfo: {
+      userAgent: navigator.userAgent,
+      platform: navigator.platform,
+      hasLiDAR: false,
+      hasDepthSensor: false,
+    },
   };
 }

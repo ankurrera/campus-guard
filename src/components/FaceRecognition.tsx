@@ -850,7 +850,7 @@ export function FaceRecognition({ onCapture, onVerify, mode, studentId }: FaceRe
               setLivenessStatus(null);
               setErrorMessage(null);
               setIs3DCapturing(false);
-              photogrammetryController.current.reset();
+              photogrammetryController.current.cleanup();
             }}
             variant="outline"
             size="lg"

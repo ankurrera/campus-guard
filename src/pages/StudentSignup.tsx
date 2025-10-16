@@ -309,58 +309,23 @@ export default function StudentSignup() {
         const studentId = insertedStudent.id;
         
         try {
-          // Import the necessary functions dynamically
-          const { upload3DFaceData, updateStudent3DFaceData } = await import('@/lib/supabaseStorage');
-          
-          // For photogrammetry capture, we store the frame data
-          // The actual 3D reconstruction would happen server-side or be processed later
+          // Call the edge function to process 3D reconstruction
           if (capture3D.frames && capture3D.frames.length > 0) {
-            // Create a Face3DCapture object with available data
-            const face3DData: {
-              method: string;
-              timestamp: Date;
-              rgbFrame: string;
-              antiSpoofingMetrics: {
-                depthScore: number;
-                textureScore: number;
-                motionScore: number;
-                confidence: number;
-              };
-              deviceInfo: {
-                userAgent: string;
-                platform: string;
-                hasLiDAR: boolean;
-                hasDepthSensor: boolean;
-              };
-            } = {
-              method: capture3D.method || 'photogrammetry',
-              timestamp: new Date(),
-              rgbFrame: imageData,
-              antiSpoofingMetrics: {
-                depthScore: 0.8,
-                textureScore: antiSpoofingResult.confidence,
-                motionScore: 0.8,
-                confidence: antiSpoofingResult.confidence
-              },
-              deviceInfo: {
-                userAgent: navigator.userAgent,
-                platform: navigator.platform,
-                hasLiDAR: false,
-                hasDepthSensor: false
+            console.log(`Processing 3D reconstruction for student ${studentId} with ${capture3D.frames.length} frames`);
+            
+            const { data: reconstructionResult, error: reconstructionError } = await supabase.functions.invoke('reconstruct-3d', {
+              body: {
+                studentId: studentId,
+                frames: capture3D.frames,
+                captureMethod: capture3D.method || 'photogrammetry',
               }
-            };
+            });
 
-            // Upload the 3D face data
-            const uploadResult = await upload3DFaceData(studentId, face3DData);
-
-            // Update student record with URLs
-            if (uploadResult.success) {
-              await updateStudent3DFaceData(
-                studentId,
-                uploadResult,
-                undefined, // Embedding would be computed server-side
-                undefined
-              );
+            if (reconstructionError) {
+              console.error('3D reconstruction error:', reconstructionError);
+            } else if (reconstructionResult?.success) {
+              console.log('3D reconstruction successful:', reconstructionResult);
+              toast.success('3D face data processed successfully!');
             }
           }
         } catch (error3D) {

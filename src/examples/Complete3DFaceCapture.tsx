@@ -103,42 +103,25 @@ export function Complete3DFaceCapture({ studentId, onComplete }: Complete3DFaceC
         setStatus('Triggering server-side processing...');
         
         // Process 3D face data
-        await fetch(
-          `${supabase.supabaseUrl}/functions/v1/process-3d-face`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${supabase.supabaseKey}`,
-            },
-            body: JSON.stringify({
-              studentId,
-              depthMapUrl: uploadResult.depthMapUrl,
-              pointCloudUrl: uploadResult.pointCloudUrl,
-              rgbFrameUrl: uploadResult.rgbFrameUrl,
-            }),
+        await supabase.functions.invoke('process-3d-face', {
+          body: {
+            studentId,
+            depthMapUrl: uploadResult.depthMapUrl,
+            pointCloudUrl: uploadResult.pointCloudUrl,
           }
-        );
+        });
 
         // Step 5: If we have multiple frames, trigger reconstruction
         if (capture3D.frames && capture3D.frames.length > 10) {
           setStatus('Queueing 3D reconstruction...');
           
-          await fetch(
-            `${supabase.supabaseUrl}/functions/v1/reconstruct-3d`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${supabase.supabaseKey}`,
-              },
-              body: JSON.stringify({
-                studentId,
-                frames: capture3D.frames,
-                captureMethod: capture3D.method,
-              }),
+          await supabase.functions.invoke('reconstruct-3d', {
+            body: {
+              studentId,
+              frames: capture3D.frames,
+              captureMethod: capture3D.method,
             }
-          );
+          });
         }
 
         setStatus('Complete!');
