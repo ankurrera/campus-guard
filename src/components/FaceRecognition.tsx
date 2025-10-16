@@ -18,10 +18,11 @@ import {
 } from '@/lib/depthAdapters/photogrammetry';
 import { BiometricConsentModal, BiometricConsentData } from './BiometricConsentModal';
 import { Switch } from './ui/switch';
+import { computeFaceDescriptor, computeFaceDescriptorFromDataUrl, FaceDescriptor } from '@/lib/faceMatching';
 
 interface FaceRecognitionProps {
-  onCapture: (imageData: string, antiSpoofingResult?: AntiSpoofingResult, capture3D?: { method: string; frames?: unknown[]; frameCount?: number; duration?: number; consentData?: BiometricConsentData | null }) => void;
-  onVerify?: (verified: boolean, antiSpoofingResult?: AntiSpoofingResult) => void;
+  onCapture: (imageData: string, antiSpoofingResult?: AntiSpoofingResult, capture3D?: { method: string; frames?: unknown[]; frameCount?: number; duration?: number; consentData?: BiometricConsentData | null }, faceDescriptor?: FaceDescriptor) => void;
+  onVerify?: (verified: boolean, antiSpoofingResult?: AntiSpoofingResult, faceDescriptor?: FaceDescriptor) => void;
   mode: 'capture' | 'verify';
   studentId?: string; // Required for 3D capture uploads
 }
@@ -471,6 +472,15 @@ export function FaceRecognition({ onCapture, onVerify, mode, studentId }: FaceRe
 
       // Get the first frame as the main image
       const firstFrame = captureResult.frames[0]?.imageData || '';
+      
+      // Compute face descriptor from the first frame
+      const faceDescriptor = await computeFaceDescriptorFromDataUrl(firstFrame);
+      
+      if (!faceDescriptor) {
+        toast.error('Failed to compute face descriptor from 3D capture. Please try again.');
+        setIsProcessing(false);
+        return;
+      }
 
       // Pass capture data to parent
       onCapture(firstFrame, spoofingResult || undefined, {
@@ -479,7 +489,7 @@ export function FaceRecognition({ onCapture, onVerify, mode, studentId }: FaceRe
         frameCount: captureResult.totalFrames,
         duration: captureResult.duration,
         consentData: consentData,
-      });
+      }, faceDescriptor);
 
       toast.success('3D face capture completed successfully!');
       setIsProcessing(false);
@@ -518,11 +528,21 @@ export function FaceRecognition({ onCapture, onVerify, mode, studentId }: FaceRe
     context.drawImage(videoRef.current, 0, 0);
 
     const imageData = canvas.toDataURL('image/jpeg');
-    onCapture(imageData, spoofingResult);
+    
+    // Compute face descriptor for face matching
+    const faceDescriptor = await computeFaceDescriptor(canvas);
+    
+    if (!faceDescriptor) {
+      toast.error('Failed to compute face descriptor. Please try again.');
+      setIsProcessing(false);
+      return;
+    }
+    
+    onCapture(imageData, spoofingResult, undefined, faceDescriptor);
 
     if (mode === 'verify' && onVerify) {
       setTimeout(() => {
-        onVerify(true, spoofingResult);
+        onVerify(true, spoofingResult, faceDescriptor);
         setIsProcessing(false);
       }, 1000);
     } else {

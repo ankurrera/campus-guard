@@ -15,6 +15,7 @@ import { Database } from '@/integrations/supabase/types';
 import { AntiSpoofingResult } from '@/lib/faceAntiSpoofing';
 import { LocationVerificationResult, DeviceFingerprinting } from '@/lib/locationSecurity';
 import { FraudDetectionEngine } from '@/lib/fraudDetection';
+import { FaceDescriptor, deserializeFaceDescriptor, compareFaceDescriptors, validateFaceDescriptor } from '@/lib/faceMatching';
 
 // Demo geofences - In production, fetch from database
 const campusGeofences = [
@@ -212,11 +213,61 @@ export default function StudentDashboard() {
     }
   };
 
-  const handleFaceVerified = async (verified: boolean, antiSpoofingResult?: AntiSpoofingResult) => {
+  const handleFaceVerified = async (verified: boolean, antiSpoofingResult?: AntiSpoofingResult, faceDescriptor?: FaceDescriptor) => {
     setCurrentFaceResult(antiSpoofingResult || null);
     
-    if (verified && locationVerified && studentInfo && currentLocationResult && antiSpoofingResult) {
+    if (verified && locationVerified && studentInfo && currentLocationResult && antiSpoofingResult && faceDescriptor) {
       try {
+        // Validate the captured face descriptor
+        if (!validateFaceDescriptor(faceDescriptor)) {
+          toast.error('Invalid face data captured. Please try again.');
+          setIsMarkingAttendance(false);
+          return;
+        }
+        
+        // Retrieve registered face embedding from database
+        if (!studentInfo.face_embedding || !studentInfo.face_embedding_algorithm) {
+          toast.error('No registered face found. Please complete registration first.');
+          setIsMarkingAttendance(false);
+          return;
+        }
+        
+        // Deserialize registered face embedding
+        const registeredEmbeddingArray = JSON.parse(studentInfo.face_embedding);
+        const registeredDescriptor = deserializeFaceDescriptor(
+          registeredEmbeddingArray,
+          studentInfo.face_embedding_algorithm
+        );
+        
+        // Compare current face with registered face
+        const matchResult = compareFaceDescriptors(
+          registeredDescriptor.descriptor,
+          faceDescriptor.descriptor,
+          0.6 // similarity threshold
+        );
+        
+        // Check if faces match
+        if (!matchResult.match) {
+          toast.error(`Face mismatch detected! Similarity: ${Math.round(matchResult.similarityScore * 100)}%. Attendance denied.`);
+          setFraudAttemptMessage(`Face verification failed: ${matchResult.message}`);
+          setIsMarkingAttendance(false);
+          
+          // Log this as a potential fraud attempt
+          console.warn('Face mismatch detected during attendance:', {
+            studentId: studentInfo.id,
+            similarityScore: matchResult.similarityScore,
+            distance: matchResult.distance
+          });
+          return;
+        }
+        
+        // Log successful match
+        console.log('Face match successful:', {
+          studentId: studentInfo.id,
+          similarityScore: matchResult.similarityScore,
+          message: matchResult.message
+        });
+        
         // Run fraud detection analysis
         const fraudAnalysis = FraudDetectionEngine.analyzeAttendanceAttempt(
           studentInfo.id,
@@ -258,7 +309,8 @@ export default function StudentDashboard() {
             onCampus: true,
             ipLocation: currentLocationResult.ipLocation,
             securityScore: currentLocationResult.confidence,
-            fraudScore: fraudAnalysis.fraudScore
+            fraudScore: fraudAnalysis.fraudScore,
+            faceMatchScore: matchResult.similarityScore
           },
           fraud_attempts: (fraudAnalysis.fraudAttempt ? [fraudAnalysis.fraudAttempt] : null) as any
         });
@@ -266,7 +318,7 @@ export default function StudentDashboard() {
         if (error) throw error;
 
         setAttendanceMarked(true);
-        toast.success(`Attendance marked successfully! Security score: ${Math.round(antiSpoofingResult.confidence * 100)}%`);
+        toast.success(`Attendance marked successfully! Face match: ${Math.round(matchResult.similarityScore * 100)}%, Security: ${Math.round(antiSpoofingResult.confidence * 100)}%`);
         setIsMarkingAttendance(false);
         
         // Refresh attendance data
@@ -294,6 +346,9 @@ export default function StudentDashboard() {
       
       toast.error(message);
       setFraudAttemptMessage(message);
+    } else if (!faceDescriptor) {
+      toast.error('Failed to capture face descriptor. Please try again.');
+      setFraudAttemptMessage('Face descriptor computation failed');
     }
   };
 
