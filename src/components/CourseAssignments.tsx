@@ -37,6 +37,7 @@ interface Course {
 
 interface TeachingAssistant {
   id: string;
+  user_id: string;
   name: string;
   email: string;
   department: string;
@@ -121,10 +122,12 @@ export function CourseAssignments() {
         .order('name');
 
       if (tasError) throw tasError;
+      console.log('Loaded TAs:', tasData?.length || 0, 'TAs for department:', deptName);
       setTeachingAssistants(tasData || []);
 
       // Load assignments for this department - filter by TAs from this department
-      const taIds = (tasData || []).map(ta => ta.id);
+      // Note: course_tas.ta_id references profiles.id, which is teaching_assistants.user_id
+      const taUserIds = (tasData || []).map(ta => ta.user_id);
       
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from('course_tas')
@@ -134,14 +137,14 @@ export function CourseAssignments() {
           course_id,
           assigned_at
         `)
-        .in('ta_id', taIds)
+        .in('ta_id', taUserIds)
         .order('assigned_at', { ascending: false });
 
       if (assignmentsError) throw assignmentsError;
 
       // Enrich assignments with TA and course data
       const enrichedAssignments = (assignmentsData || []).map((assignment: any) => {
-        const ta = tasData?.find(t => t.id === assignment.ta_id);
+        const ta = tasData?.find(t => t.user_id === assignment.ta_id);
         const course = coursesData?.find(c => c.id === assignment.course_id);
         return {
           ...assignment,
@@ -405,7 +408,7 @@ export function CourseAssignments() {
                       </div>
                     ) : (
                       teachingAssistants.map((ta) => (
-                        <SelectItem key={ta.id} value={ta.id}>
+                        <SelectItem key={ta.id} value={ta.user_id}>
                           {ta.name} ({ta.email})
                         </SelectItem>
                       ))
