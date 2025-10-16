@@ -69,11 +69,11 @@ Stores section information linked to departments and years.
 - `created_at`, `updated_at`: Timestamps
 
 ### 7. semesters (NEW)
-Stores semester information linked to years (2 semesters per year).
+Stores semester information linked to years (2 semesters per year, numbered 1-8 globally).
 - `id`: Primary key (UUID)
 - `year_id`: References years.id
-- `semester_number`: Semester number (1 or 2)
-- `semester_name`: Display name (e.g., "Semester 1", "Semester 2")
+- `semester_number`: Semester number (1-8 globally: 1st Year has 1-2, 2nd Year has 3-4, 3rd Year has 5-6, 4th Year has 7-8)
+- `semester_name`: Display name (e.g., "Semester 1", "Semester 2", ..., "Semester 8")
 - `created_at`, `updated_at`: Timestamps
 
 ### 8. department_course_map (NEW)
@@ -132,6 +132,12 @@ The `user_role` enum has been updated to include:
     - The `department_course_map` table for course-semester mapping
     - Auto-creation triggers for years and semesters
     - RLS policies for semester and course mapping data
+22. **Copy the contents of `010_fix_semester_year_mapping.sql` (IMPORTANT - fixes semester numbering)**
+23. **Paste and execute the SQL commands in the SQL Editor** - This fixes:
+    - Updates semester_number constraint to allow 1-8 (instead of 1-2)
+    - Re-maps semesters correctly: 1st Year→1-2, 2nd Year→3-4, 3rd Year→5-6, 4th Year→7-8
+    - Updates auto-creation trigger to use the new mapping
+    - ⚠️ **Warning**: This will clear existing semester data and course-semester mappings
 
 ## Sample Data
 
@@ -147,7 +153,11 @@ The migration includes sample academic structure:
 - Departments: CSE, ECE, ME, CE
 - Years: 1st Year, 2nd Year, 3rd Year, 4th Year (for each department)
 - Sections: A, B, C, D (for each department-year combination)
-- Semesters: Semester 1 and Semester 2 (for each year, totaling 8 per department)
+- Semesters: **Semesters 1-8 mapped to years** (migration 010):
+  - 1st Year → Semester 1 & Semester 2
+  - 2nd Year → Semester 3 & Semester 4
+  - 3rd Year → Semester 5 & Semester 6
+  - 4th Year → Semester 7 & Semester 8
 
 ## Security Policies
 
@@ -189,8 +199,12 @@ After running the migration:
 
 When a new department is created:
 1. **4 years are automatically generated** (1st Year, 2nd Year, 3rd Year, 4th Year)
-2. **For each year, 2 semesters are automatically created** (Semester 1, Semester 2)
-3. This results in **8 semesters total per department** (4 years × 2 semesters)
+2. **For each year, 2 semesters are automatically created** with proper numbering:
+   - 1st Year: Semester 1 & Semester 2
+   - 2nd Year: Semester 3 & Semester 4
+   - 3rd Year: Semester 5 & Semester 6
+   - 4th Year: Semester 7 & Semester 8
+3. This results in **8 semesters total per department** (4 years × 2 semesters), numbered 1-8 globally
 
 This automation ensures:
 - Consistent academic structure across all departments
