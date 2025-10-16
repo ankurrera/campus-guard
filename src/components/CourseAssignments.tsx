@@ -121,8 +121,14 @@ export function CourseAssignments() {
         .eq('department', deptName)
         .order('name');
 
-      if (tasError) throw tasError;
+      if (tasError) {
+        console.error('Error loading TAs:', tasError);
+        throw tasError;
+      }
       console.log('Loaded TAs:', tasData?.length || 0, 'TAs for department:', deptName);
+      if (tasData && tasData.length > 0) {
+        console.log('Sample TA data:', tasData[0]);
+      }
       setTeachingAssistants(tasData || []);
 
       // Load assignments for this department - filter by TAs from this department
@@ -140,7 +146,11 @@ export function CourseAssignments() {
         .in('ta_id', taUserIds)
         .order('assigned_at', { ascending: false });
 
-      if (assignmentsError) throw assignmentsError;
+      if (assignmentsError) {
+        console.error('Error loading assignments:', assignmentsError);
+        throw assignmentsError;
+      }
+      console.log('Loaded assignments:', assignmentsData?.length || 0);
 
       // Enrich assignments with TA and course data
       const enrichedAssignments = (assignmentsData || []).map((assignment: any) => {
@@ -223,10 +233,11 @@ export function CourseAssignments() {
       loadDepartmentData();
     } catch (error: any) {
       console.error('Error saving assignment:', error);
+      console.error('Assignment details - TA ID:', selectedTA, 'Course ID:', selectedCourse);
       if (error.code === '23505') {
         toast.error('This TA is already assigned to this course');
       } else {
-        toast.error('Failed to save assignment');
+        toast.error(`Failed to save assignment: ${error.message || 'Unknown error'}`);
       }
     }
   };
