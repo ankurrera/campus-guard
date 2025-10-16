@@ -12,8 +12,6 @@ CREATE TABLE IF NOT EXISTS semesters (
 -- Create department_course_map table to link semesters to courses
 CREATE TABLE IF NOT EXISTS department_course_map (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    department_id UUID NOT NULL REFERENCES departments(id) ON DELETE CASCADE,
-    year_id UUID NOT NULL REFERENCES years(id) ON DELETE CASCADE,
     semester_id UUID NOT NULL REFERENCES semesters(id) ON DELETE CASCADE,
     course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
@@ -23,8 +21,6 @@ CREATE TABLE IF NOT EXISTS department_course_map (
 
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_semesters_year_id ON semesters(year_id);
-CREATE INDEX IF NOT EXISTS idx_department_course_map_department_id ON department_course_map(department_id);
-CREATE INDEX IF NOT EXISTS idx_department_course_map_year_id ON department_course_map(year_id);
 CREATE INDEX IF NOT EXISTS idx_department_course_map_semester_id ON department_course_map(semester_id);
 CREATE INDEX IF NOT EXISTS idx_department_course_map_course_id ON department_course_map(course_id);
 

@@ -77,10 +77,8 @@ Stores semester information linked to years (2 semesters per year).
 - `created_at`, `updated_at`: Timestamps
 
 ### 8. department_course_map (NEW)
-Maps subjects (courses) to specific department-year-semester combinations.
+Maps subjects (courses) to specific semesters.
 - `id`: Primary key (UUID)
-- `department_id`: References departments.id
-- `year_id`: References years.id
 - `semester_id`: References semesters.id
 - `course_id`: References courses.id (from centralized courses pool)
 - `created_at`, `updated_at`: Timestamps
