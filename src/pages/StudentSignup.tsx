@@ -15,6 +15,7 @@ import { authService, dbService } from '@/lib/dataService';
 import { AntiSpoofingResult } from '@/lib/faceAntiSpoofing';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
+import { FaceDescriptor, serializeFaceDescriptor, validateFaceDescriptor } from '@/lib/faceMatching';
 
 type Department = Database['public']['Tables']['departments']['Row'];
 type Year = Database['public']['Tables']['years']['Row'];
@@ -209,7 +210,7 @@ export default function StudentSignup() {
     }
   };
 
-  const handleFaceCapture = async (imageData: string, antiSpoofingResult?: AntiSpoofingResult, capture3D?: { method: string; frames?: unknown[]; frameCount?: number; duration?: number; consentData?: BiometricConsentData | null }) => {
+  const handleFaceCapture = async (imageData: string, antiSpoofingResult?: AntiSpoofingResult, capture3D?: { method: string; frames?: unknown[]; frameCount?: number; duration?: number; consentData?: BiometricConsentData | null }, faceDescriptor?: FaceDescriptor) => {
     setLoading(true);
 
     // Check if face is live and secure
@@ -234,6 +235,13 @@ export default function StudentSignup() {
     // Require high confidence for registration
     if (antiSpoofingResult.confidence < 0.6) {
       toast.error(`Face quality too low for registration. Quality: ${Math.round(antiSpoofingResult.confidence * 100)}%. Please ensure good lighting and clear face visibility.`);
+      setLoading(false);
+      return;
+    }
+    
+    // Validate face descriptor
+    if (!faceDescriptor || !validateFaceDescriptor(faceDescriptor)) {
+      toast.error('Failed to generate valid face embedding. Please try again with better lighting.');
       setLoading(false);
       return;
     }
@@ -271,6 +279,9 @@ export default function StudentSignup() {
 
       // Determine if biometric consent was granted (3D capture implies consent)
       const hasConsent = !!capture3D;
+      
+      // Serialize face descriptor for storage
+      const faceEmbeddingArray = serializeFaceDescriptor(faceDescriptor);
 
       // Save student profile with face data - use the session user ID to ensure RLS passes
       const { data: insertedStudent, error } = await dbService.students.insert({
@@ -293,6 +304,8 @@ export default function StudentSignup() {
           securityVersion: '2.0',
           has3DCapture: hasConsent
         }),
+        face_embedding: JSON.stringify(faceEmbeddingArray),
+        face_embedding_algorithm: faceDescriptor.algorithm,
         biometric_consent: hasConsent,
         biometric_consent_date: hasConsent ? new Date().toISOString() : null,
       });
