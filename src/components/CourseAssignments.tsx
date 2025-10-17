@@ -184,7 +184,7 @@ export function CourseAssignments() {
 
   const loadSemesters = async (yearId: string) => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('semesters')
         .select('*')
         .eq('year_id', yearId)
@@ -200,8 +200,22 @@ export function CourseAssignments() {
 
   const loadCourses = async (semesterId: string) => {
     try {
+      // First, get the semester details to extract semester_number
+      const { data: semesterData, error: semesterError } = await (supabase as any)
+        .from('semesters')
+        .select('semester_number')
+        .eq('id', semesterId)
+        .single();
+
+      if (semesterError) throw semesterError;
+      if (!semesterData) {
+        setCourses([]);
+        return;
+      }
+
       // Get courses linked to this semester via department_course_map
-      const { data, error } = await supabase
+      // department_course_map uses semester (integer) not semester_id
+      const { data, error } = await (supabase as any)
         .from('department_course_map')
         .select(`
           course_id,
@@ -212,7 +226,8 @@ export function CourseAssignments() {
             description
           )
         `)
-        .eq('semester_id', semesterId);
+        .eq('semester', semesterData.semester_number)
+        .eq('department_id', formDepartment);
 
       if (error) throw error;
       
@@ -221,6 +236,7 @@ export function CourseAssignments() {
         .map((item: any) => item.courses)
         .filter((course: any) => course !== null);
       
+      console.log('Loaded courses:', coursesData?.length || 0);
       setCourses(coursesData || []);
     } catch (error) {
       console.error('Error loading courses:', error);
