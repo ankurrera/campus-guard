@@ -47,7 +47,6 @@ interface Course {
   title: string;
   code: string;
   description?: string;
-  name?: string;
 }
 
 interface TeachingAssistant {
@@ -209,7 +208,6 @@ export function CourseAssignments() {
           courses (
             id,
             code,
-            name,
             title,
             description
           )
@@ -655,7 +653,7 @@ export function CourseAssignments() {
                     ) : (
                       courses.map((course) => (
                         <SelectItem key={course.id} value={course.id}>
-                          {course.code} - {course.title || course.name}
+                          {course.code} - {course.title}
                         </SelectItem>
                       ))
                     )}
