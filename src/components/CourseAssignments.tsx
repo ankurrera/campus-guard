@@ -236,15 +236,27 @@ export function CourseAssignments() {
         .map((item: any) => item.courses)
         .filter((course: any) => course !== null);
       
-      console.log('Loaded courses:', coursesData?.length || 0);
+      console.log('Loaded courses via map:', coursesData?.length || 0);
+
+      // Fallback: if no mapping exists yet, load all courses (admin-only via RLS)
+      if (!coursesData || coursesData.length === 0) {
+        const { data: allCourses, error: allCoursesError } = await supabase
+          .from('courses')
+          .select('*')
+          .order('code');
+        if (allCoursesError) throw allCoursesError;
+        setCourses(allCourses || []);
+        return;
+      }
+
       setCourses(coursesData || []);
     } catch (error) {
       console.error('Error loading courses:', error);
       toast.error('Failed to load courses');
     }
   };
-
-  const loadDepartmentData = async () => {
+ 
+   const loadDepartmentData = async () => {
     if (!selectedDepartment) return;
     
     setLoading(true);
@@ -322,7 +334,7 @@ export function CourseAssignments() {
     } else {
       setIsEditing(false);
       setCurrentAssignment(null);
-      setFormDepartment('');
+      setFormDepartment(selectedDepartment);
       setSelectedYear('');
       setSelectedSemester('');
       setSelectedTA('');

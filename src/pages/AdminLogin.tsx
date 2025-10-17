@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { authService } from '@/lib/dataService';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function AdminLogin() {
   const navigate = useNavigate();
@@ -14,20 +16,41 @@ export default function AdminLogin() {
     email: '',
     password: '',
   });
+  const [loading, setLoading] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Demo admin login
-    if (formData.email === 'admin@college.edu' && formData.password === 'admin123') {
+    setLoading(true);
+    try {
+      const { error } = await authService.signInWithPassword(formData.email, formData.password);
+      if (error) throw error;
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Login failed');
+
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      if (profileError) throw profileError;
+
+      if (profile?.role !== 'admin') {
+        await authService.signOut();
+        toast.error('Access denied: admin account required');
+        return;
+      }
+
       toast.success('Admin login successful!');
       navigate('/admin/dashboard');
-    } else {
-      toast.error('Invalid admin credentials');
+    } catch (err: any) {
+      toast.error(err?.message || 'Invalid credentials');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -43,12 +66,6 @@ export default function AdminLogin() {
         </div>
 
         <form onSubmit={handleLogin} className="glass-card rounded-2xl p-8 fade-in space-y-6">
-          <div className="bg-warning/10 border border-warning/20 rounded-lg p-3 text-sm">
-            <p className="text-warning">Demo Credentials:</p>
-            <p className="text-muted-foreground">Email: admin@college.edu</p>
-            <p className="text-muted-foreground">Password: admin123</p>
-          </div>
-
           <div className="space-y-2">
             <Label htmlFor="email">Admin Email</Label>
             <div className="relative">
@@ -85,10 +102,11 @@ export default function AdminLogin() {
 
           <Button
             type="submit"
+            disabled={loading}
             className={cn(buttonVariants({ variant: "royal", size: "lg" }), "w-full")}
           >
             <Shield className="w-4 h-4 mr-2" />
-            Admin Sign In
+            {loading ? 'Signing in...' : 'Admin Sign In'}
           </Button>
         </form>
 

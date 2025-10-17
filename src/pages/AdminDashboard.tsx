@@ -16,7 +16,7 @@ import { CourseAssignments } from '@/components/CourseAssignments';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { authService, dbService, statsService, getServiceStatus } from '@/lib/dataService';
-
+import { supabase } from '@/integrations/supabase/client';
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
@@ -33,11 +33,30 @@ export default function AdminDashboard() {
   const [serviceStatus, setServiceStatus] = useState({ supabase: false, mockData: true });
 
   useEffect(() => {
-    loadDashboardData();
+    verifyAdminAndLoad();
   }, []);
 
+  const verifyAdminAndLoad = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('Please sign in as admin');
+        navigate('/admin/login');
+        return;
+      }
+      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+      if (profile?.role !== 'admin') {
+        toast.error('Admin access required');
+        navigate('/admin/login');
+        return;
+      }
+      await loadDashboardData();
+    } catch (e) {
+      navigate('/admin/login');
+    }
+  };
+
   const loadDashboardData = async () => {
-    setLoading(true);
     try {
       // Get service status
       const status = await getServiceStatus();
