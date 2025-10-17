@@ -61,13 +61,13 @@ const TADashboard = () => {
           course_id,
           courses (*)
         `)
-        .eq('ta_id', (taData as any).id);
+        .eq('ta_id', user.id);
 
       if (assignmentError) throw assignmentError;
 
       const courses = courseAssignments?.map((assignment: any) => ({
         id: assignment.courses?.id,
-        name: assignment.courses?.name,
+        title: assignment.courses?.title,
         code: assignment.courses?.code,
         description: assignment.courses?.description,
         department: assignment.courses?.department,
@@ -252,7 +252,7 @@ const TADashboard = () => {
                         </Badge>
                       </div>
                       <CardDescription className="text-gray-300">
-                        {course.name}
+                        {course.title}
                       </CardDescription>
                     </CardHeader>
                     {course.description && (

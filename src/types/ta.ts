@@ -13,7 +13,7 @@ export interface TeachingAssistant {
 
 export interface Course {
   id: string;
-  name: string;
+  title: string;
   code: string;
   description?: string;
   department?: string;
