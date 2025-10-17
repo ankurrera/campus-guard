@@ -28,11 +28,26 @@ interface Department {
   code: string;
 }
 
+interface Year {
+  id: string;
+  department_id: string;
+  year_number: number;
+  year_name: string;
+}
+
+interface Semester {
+  id: string;
+  year_id: string;
+  semester_number: number;
+  semester_name: string;
+}
+
 interface Course {
   id: string;
   title: string;
   code: string;
   description?: string;
+  name?: string;
 }
 
 interface TeachingAssistant {
@@ -66,12 +81,18 @@ export function CourseAssignments() {
   const [isEditing, setIsEditing] = useState(false);
   const [currentAssignment, setCurrentAssignment] = useState<CourseAssignment | null>(null);
   
-  // Form states
+  // Form states - now includes Year and Semester
+  const [formDepartment, setFormDepartment] = useState<string>('');
+  const [years, setYears] = useState<Year[]>([]);
+  const [selectedYear, setSelectedYear] = useState<string>('');
+  const [semesters, setSemesters] = useState<Semester[]>([]);
+  const [selectedSemester, setSelectedSemester] = useState<string>('');
   const [selectedTA, setSelectedTA] = useState<string>('');
   const [selectedCourse, setSelectedCourse] = useState<string>('');
 
   useEffect(() => {
     loadDepartments();
+    loadAllTeachingAssistants(); // Load TAs once on mount
   }, []);
 
   useEffect(() => {
@@ -80,6 +101,36 @@ export function CourseAssignments() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDepartment]);
+
+  // Load years when form department is selected
+  useEffect(() => {
+    if (formDepartment) {
+      loadYears(formDepartment);
+    } else {
+      setYears([]);
+      setSelectedYear('');
+    }
+  }, [formDepartment]);
+
+  // Load semesters when year is selected
+  useEffect(() => {
+    if (selectedYear) {
+      loadSemesters(selectedYear);
+    } else {
+      setSemesters([]);
+      setSelectedSemester('');
+    }
+  }, [selectedYear]);
+
+  // Load courses when semester is selected
+  useEffect(() => {
+    if (selectedSemester && formDepartment) {
+      loadCourses(selectedSemester);
+    } else {
+      setCourses([]);
+      setSelectedCourse('');
+    }
+  }, [selectedSemester, formDepartment]);
 
   const loadDepartments = async () => {
     try {
@@ -96,35 +147,112 @@ export function CourseAssignments() {
     }
   };
 
-  const loadDepartmentData = async () => {
-    if (!selectedDepartment) return;
-    
-    setLoading(true);
+  const loadAllTeachingAssistants = async () => {
     try {
-      // Load courses for this department (courses don't have department field, load all)
-      const { data: coursesData, error: coursesError } = await supabase
-        .from('courses')
-        .select('*')
-        .order('code');
-
-      if (coursesError) throw coursesError;
-      setCourses(coursesData || []);
-
-      // Load all TAs (admins can assign any TA to any course)
+      // Load all TAs from the system (independent dropdown)
       const { data: tasData, error: tasError } = await supabase
         .from('teaching_assistants')
-        .select('id, name, email, department')
+        .select('id, user_id, name, email, department')
         .order('name');
 
       if (tasError) {
         console.error('Error loading TAs:', tasError);
         throw tasError;
       }
-      console.log('Loaded TAs:', tasData?.length || 0, 'TAs (all departments)');
-      if (tasData && tasData.length > 0) {
-        console.log('Sample TA data:', tasData[0]);
-      }
+      console.log('Loaded TAs:', tasData?.length || 0, 'TAs');
       setTeachingAssistants(tasData || []);
+    } catch (error) {
+      console.error('Error loading teaching assistants:', error);
+      toast.error('Failed to load teaching assistants');
+    }
+  };
+
+  const loadYears = async (departmentId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('years')
+        .select('*')
+        .eq('department_id', departmentId)
+        .order('year_number');
+
+      if (error) throw error;
+      setYears(data || []);
+    } catch (error) {
+      console.error('Error loading years:', error);
+      toast.error('Failed to load years');
+    }
+  };
+
+  const loadSemesters = async (yearId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('semesters')
+        .select('*')
+        .eq('year_id', yearId)
+        .order('semester_number');
+
+      if (error) throw error;
+      setSemesters(data || []);
+    } catch (error) {
+      console.error('Error loading semesters:', error);
+      toast.error('Failed to load semesters');
+    }
+  };
+
+  const loadCourses = async (semesterId: string) => {
+    try {
+      // Get courses linked to this semester via department_course_map
+      const { data, error } = await supabase
+        .from('department_course_map')
+        .select(`
+          course_id,
+          courses (
+            id,
+            code,
+            name,
+            title,
+            description
+          )
+        `)
+        .eq('semester_id', semesterId);
+
+      if (error) throw error;
+      
+      // Extract courses from the mapping
+      const coursesData = (data || [])
+        .map((item: any) => item.courses)
+        .filter((course: any) => course !== null);
+      
+      setCourses(coursesData || []);
+    } catch (error) {
+      console.error('Error loading courses:', error);
+      toast.error('Failed to load courses');
+    }
+  };
+
+  const loadDepartmentData = async () => {
+    if (!selectedDepartment) return;
+    
+    setLoading(true);
+    try {
+      // Load all TAs (already loaded on mount, but we need to reload assignments)
+      const { data: tasData, error: tasError } = await supabase
+        .from('teaching_assistants')
+        .select('id, user_id, name, email, department')
+        .order('name');
+
+      if (tasError) {
+        console.error('Error loading TAs:', tasError);
+        throw tasError;
+      }
+
+      // Load courses for display in the table (all courses)
+      const { data: coursesData, error: coursesError } = await supabase
+        .from('courses')
+        .select('*')
+        .order('code');
+
+      if (coursesError) throw coursesError;
 
       // Load assignments for all TAs
       // Note: course_tas.ta_id references profiles.id, which is teaching_assistants.user_id
@@ -173,9 +301,16 @@ export function CourseAssignments() {
       setCurrentAssignment(assignment);
       setSelectedTA(assignment.ta_id);
       setSelectedCourse(assignment.course_id);
+      // For editing, we don't set department/year/semester as they are derived from course
+      setFormDepartment('');
+      setSelectedYear('');
+      setSelectedSemester('');
     } else {
       setIsEditing(false);
       setCurrentAssignment(null);
+      setFormDepartment('');
+      setSelectedYear('');
+      setSelectedSemester('');
       setSelectedTA('');
       setSelectedCourse('');
     }
@@ -186,6 +321,9 @@ export function CourseAssignments() {
     setIsModalOpen(false);
     setIsEditing(false);
     setCurrentAssignment(null);
+    setFormDepartment('');
+    setSelectedYear('');
+    setSelectedSemester('');
     setSelectedTA('');
     setSelectedCourse('');
   };
@@ -193,8 +331,25 @@ export function CourseAssignments() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!selectedTA || !selectedCourse) {
-      toast.error('Please select both a TA and a course');
+    // Validate all required fields
+    if (!formDepartment) {
+      toast.error('Please select a department');
+      return;
+    }
+    if (!selectedYear) {
+      toast.error('Please select a year');
+      return;
+    }
+    if (!selectedSemester) {
+      toast.error('Please select a semester');
+      return;
+    }
+    if (!selectedCourse) {
+      toast.error('Please select a course');
+      return;
+    }
+    if (!selectedTA) {
+      toast.error('Please select a teaching assistant');
       return;
     }
 
@@ -221,7 +376,7 @@ export function CourseAssignments() {
           });
 
         if (error) throw error;
-        toast.success('Assignment created successfully');
+        toast.success('Assignment Created Successfully');
       }
 
       handleCloseModal();
@@ -394,18 +549,125 @@ export function CourseAssignments() {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="department">Department</Label>
-                <Input
-                  id="department"
-                  value={departments.find(d => d.id === selectedDepartment)?.name || ''}
-                  disabled
-                  className="bg-muted"
-                />
+                <Select 
+                  value={formDepartment} 
+                  onValueChange={(value) => {
+                    setFormDepartment(value);
+                    setSelectedYear('');
+                    setSelectedSemester('');
+                    setSelectedCourse('');
+                  }}
+                  disabled={isEditing}
+                >
+                  <SelectTrigger id="department">
+                    <SelectValue placeholder="Select Department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments.length === 0 ? (
+                      <div className="p-2 text-sm text-muted-foreground">
+                        No departments available
+                      </div>
+                    ) : (
+                      departments.map((dept) => (
+                        <SelectItem key={dept.id} value={dept.id}>
+                          {dept.name} ({dept.code})
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="year">Year</Label>
+                <Select 
+                  value={selectedYear} 
+                  onValueChange={(value) => {
+                    setSelectedYear(value);
+                    setSelectedSemester('');
+                    setSelectedCourse('');
+                  }}
+                  disabled={!formDepartment || isEditing}
+                >
+                  <SelectTrigger id="year">
+                    <SelectValue placeholder="Select Year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {years.length === 0 ? (
+                      <div className="p-2 text-sm text-muted-foreground">
+                        {formDepartment ? 'No years available' : 'Select a department first'}
+                      </div>
+                    ) : (
+                      years.map((year) => (
+                        <SelectItem key={year.id} value={year.id}>
+                          {year.year_name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="semester">Semester</Label>
+                <Select 
+                  value={selectedSemester} 
+                  onValueChange={(value) => {
+                    setSelectedSemester(value);
+                    setSelectedCourse('');
+                  }}
+                  disabled={!selectedYear || isEditing}
+                >
+                  <SelectTrigger id="semester">
+                    <SelectValue placeholder="Select Semester" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {semesters.length === 0 ? (
+                      <div className="p-2 text-sm text-muted-foreground">
+                        {selectedYear ? 'No semesters available' : 'Select a year first'}
+                      </div>
+                    ) : (
+                      semesters.map((semester) => (
+                        <SelectItem key={semester.id} value={semester.id}>
+                          {semester.semester_name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="course">Course</Label>
+                <Select 
+                  value={selectedCourse} 
+                  onValueChange={setSelectedCourse}
+                  disabled={!selectedSemester || isEditing}
+                >
+                  <SelectTrigger id="course">
+                    <SelectValue placeholder="Select Course" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {courses.length === 0 ? (
+                      <div className="p-2 text-sm text-muted-foreground">
+                        {selectedSemester ? 'No courses available for this semester' : 'Select a semester first'}
+                      </div>
+                    ) : (
+                      courses.map((course) => (
+                        <SelectItem key={course.id} value={course.id}>
+                          {course.code} - {course.title || course.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="ta">Teaching Assistant</Label>
-                <Select value={selectedTA} onValueChange={setSelectedTA} required>
+                <Select value={selectedTA} onValueChange={setSelectedTA}>
                   <SelectTrigger id="ta">
-                    <SelectValue placeholder="Select a TA" />
+                    <SelectValue placeholder="Select Teaching Assistant" />
                   </SelectTrigger>
                   <SelectContent>
                     {teachingAssistants.length === 0 ? (
@@ -416,27 +678,6 @@ export function CourseAssignments() {
                       teachingAssistants.map((ta) => (
                         <SelectItem key={ta.id} value={ta.user_id}>
                           {ta.name} ({ta.email})
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="course">Course</Label>
-                <Select value={selectedCourse} onValueChange={setSelectedCourse} required>
-                  <SelectTrigger id="course">
-                    <SelectValue placeholder="Select a course" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {courses.length === 0 ? (
-                      <div className="p-2 text-sm text-muted-foreground">
-                        No courses available in this department
-                      </div>
-                    ) : (
-                      courses.map((course) => (
-                        <SelectItem key={course.id} value={course.id}>
-                          {course.code} - {course.title}
                         </SelectItem>
                       ))
                     )}
